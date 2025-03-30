@@ -7,6 +7,8 @@ from PIL import Image
 from streamlit_pdf_viewer import pdf_viewer
 
 
+########## 세션 상태 초기화 ###########
+
 if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 	if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 API KEY 가져오기 
 		load_dotenv()
@@ -16,6 +18,12 @@ if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 	
 if 'masked_API_KEY' not in st.session_state:
 	st.session_state.masked_API_KEY = ""
+
+if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
+	st.session_state.viewer_visible = False
+
+if 'last_uploaded_file' not in st.session_state:
+	st.session_state.last_uploaded_file = None
 
 
 
@@ -32,9 +40,10 @@ def initial_run():
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
     
 	# API 호출
-	text = test_function(st.session_state.API_KEY, file_path)
-
+	text = test_function(st.session_state.API_KEY, file_path) 
+	
 	# 결과 표시
+	st.session_state.viewer_visible = False # 파일 뷰어 끄기
 	with container_result:
 		st.markdown(text)
 
@@ -104,14 +113,17 @@ with container_file:
 	
 	# 파일 업로드 시 파일 첫 페이지 표시
 	if uploaded_file: 
-		if uploaded_file.type == "application/pdf": # pdf 파일일 경우
-			temp = uploaded_file.getvalue()
-			pdf_viewer(input=temp, pages_to_render=[1])
+		if uploaded_file != st.session_state.last_uploaded_file: # 상태 변경
+			st.session_state.viewer_visible = True
+			st.session_state.last_uploaded_file = uploaded_file
 
-		else: # 이미지 파일일 경우
-			image = Image.open(uploaded_file)
-			st.image(image, use_container_width=True)
-
+		if st.session_state.viewer_visible: 
+			if uploaded_file.type == "application/pdf": # pdf 파일일 경우
+				temp = uploaded_file.getvalue()
+				viewer = pdf_viewer(input=temp, pages_to_render=[1])
+			else: # 이미지 파일일 경우
+				image = Image.open(uploaded_file)
+				viewer = st.image(image, use_container_width=True)
 
 
 # 결과 보여주는 칸
