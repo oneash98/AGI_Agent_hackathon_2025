@@ -1,5 +1,6 @@
 test*
 sample_data/
+uploaded_files/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
