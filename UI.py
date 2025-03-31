@@ -1,6 +1,7 @@
 import streamlit as st
-from streamlit_pdf_viewer import pdf_viewer
 import streamlit.components.v1 as components
+from streamlit_pdf_viewer import pdf_viewer
+from streamlit_geolocation import streamlit_geolocation
 from main import test_function
 import os
 from datetime import datetime
@@ -11,21 +12,16 @@ from PIL import Image
 
 ########## 세션 상태 초기화 ###########
 
+# 업스테이지 api
 if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 	if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 API KEY 가져오기 
 		load_dotenv()
 		st.session_state.API_KEY = os.getenv("API_KEY")
 	else: # 스트림릿 웹에서 실행 시
 		st.session_state.API_KEY = ""
-	
+
 if 'masked_API_KEY' not in st.session_state:
 	st.session_state.masked_API_KEY = ""
-
-if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
-	st.session_state.viewer_visible = False
-
-if 'last_uploaded_file' not in st.session_state:
-	st.session_state.last_uploaded_file = None
 
 # 구글맵 api
 if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 
@@ -33,6 +29,18 @@ if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시
 	GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 else: # 스트림릿 웹에서 실행 시
 	GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
+	
+
+if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
+	st.session_state.viewer_visible = False
+
+if 'last_uploaded_file' not in st.session_state:
+	st.session_state.last_uploaded_file = None
+
+if 'has_result' not in st.session_state: # 결과 상태 설정
+    st.session_state.has_result = False
+    st.session_state.summary_text = ""
+
 
 
 
@@ -51,11 +59,10 @@ def initial_run():
 	# API 호출
 	text = test_function(st.session_state.API_KEY, file_path) 
 	
-	# 결과 표시
+	# 세션 상태에 결과 저장
+	st.session_state.summary_text = text
+	st.session_state.has_result = True
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
-	with container_result:
-		st.markdown(text) # 요약 결과
-
 
 # 파일 저장 함수
 def save_file(uploaded_file):
@@ -73,6 +80,21 @@ def save_file(uploaded_file):
 		f.write(uploaded_file.getbuffer())
 
 	return file_path
+
+# 지도 표시 함수
+def show_map(place_name):
+	map_url = f"""
+	<iframe 
+	    src="https://www.google.com/maps/embed/v1/place?key={GOOGLE_MAPS_API_KEY}&q={place_name}&language=ko" 
+	    width="600" 
+	    height="450" 
+	    style="border:0;" 
+	    allowfullscreen="" 
+	    loading="lazy">
+	</iframe>
+	"""
+	with container_map:
+		components.html(map_url, height=500)
 
 
 
@@ -125,6 +147,7 @@ with container_file:
 		if uploaded_file != st.session_state.last_uploaded_file: # 상태 변경
 			st.session_state.viewer_visible = True
 			st.session_state.last_uploaded_file = uploaded_file
+			st.session_state.has_result = False
 
 		if st.session_state.viewer_visible: 
 			if uploaded_file.type == "application/pdf": # pdf 파일일 경우
@@ -134,26 +157,78 @@ with container_file:
 				image = Image.open(uploaded_file)
 				viewer = st.image(image, use_container_width=True)
 
-
-# 결과 보여주는 칸
+# 결과 표시 칸
 container_result = st.container()
 
+if 'has_result' in st.session_state and st.session_state.has_result:
+	# 결과 표시
+	with container_result:
+		# 요약 결과
+		st.subheader("요약 결과")
+		st.markdown(st.session_state.summary_text) 
 
-# 지도 표시
-# HTML 코드로 Google Maps 삽입
-def generate_google_map(lat, lng, zoom=12):
-	return f"""
-	<iframe
-		width="700"
-		height="500"
-		frameborder="0" style="border:0"
-		src="https://www.google.com/maps/embed/v1/view?key={GOOGLE_MAPS_API_KEY}&center={lat},{lng}&zoom={zoom}" allowfullscreen>
-	</iframe>
-	"""
+		# 병원 추천
+		st.subheader("추천 병원") # 추천 병원
+		place_name1 = "신촌연세병원"
+		place_name2 = "신촌세브란스"
 
-# 사용자 입력으로 위도와 경도 설정
-st.header("Google Maps with API")
-latitude = st.number_input("Enter Latitude", value=37.7749)  # Default: San Francisco
-longitude = st.number_input("Enter Longitude", value=-122.4194)  # Default: San Francisco
-map_html = generate_google_map(latitude, longitude)
-components.html(map_html, height=500)
+		st.button(place_name1, on_click=show_map, args=(place_name1,))
+		st.markdown(f"""
+		**주소:** "서울특별시 마포구 서강로 110, 지2층~6층 (신수동)"  
+		**전화번호:** "02-337-7582"  
+		**홈페이지:** "http://www.scys.co.kr"
+		""")
+
+		st.button(place_name2, on_click=show_map, args=(place_name2,))
+		st.markdown(f"""
+		**주소:** "서울특별시 서대문구 연세로 50-1, (신촌동)"  
+		**전화번호:** "02-2228-0114"  
+		**홈페이지:** "http://www.yuhs.or.kr"
+		""")
+
+# 지도 표시 칸
+container_map = st.container()
+
+
+
+
+
+# st.title("GPS 기능을 사용하여 나의 현 위치 확인")
+
+# # 사용자 위치 가져오기
+# location = streamlit_geolocation()
+
+# # 위치 정보 출력
+# if location:
+#     st.write(f"위도: {location['latitude']}")
+#     st.write(f"경도: {location['longitude']}")
+#     st.write(f"정확도: {location['accuracy']}m")
+# else:
+#     st.write("위치를 가져오는 중입니다. 버튼을 눌러 승인하세요.")
+
+
+
+########## CSS ###########
+# style = """
+# <style>
+#     button {
+#         background: none!important;
+#         border: none;
+#         padding: 0!important;
+#         color: black !important;
+#         text-decoration: none;
+#         cursor: pointer;
+#         border: none !important;
+#     }
+#     button:hover {
+#         text-decoration: none;
+#         color: black !important;
+#     }
+#     button:focus {
+#         outline: none !important;
+#         box-shadow: none !important;
+#         color: black !important;
+#     }
+# </style>
+# """
+# st.markdown(style, unsafe_allow_html=True)
