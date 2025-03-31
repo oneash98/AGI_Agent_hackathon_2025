@@ -1,10 +1,11 @@
 import streamlit as st
+from streamlit_pdf_viewer import pdf_viewer
 from main import test_function
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
-from streamlit_pdf_viewer import pdf_viewer
+
 
 
 ########## 세션 상태 초기화 ###########
@@ -24,6 +25,13 @@ if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
 
 if 'last_uploaded_file' not in st.session_state:
 	st.session_state.last_uploaded_file = None
+
+# 네이버 지도 api
+if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 
+	load_dotenv()
+	NAVER_MAP_CLIENT_ID = os.getenv("NAVER_MAP_CLIENT_ID")
+else: # 스트림릿 웹에서 실행 시
+	NAVER_MAP_CLIENT_ID = st.secrets["NAVER_MAP_CLIENT_ID"]
 
 
 
@@ -45,7 +53,23 @@ def initial_run():
 	# 결과 표시
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
 	with container_result:
-		st.markdown(text)
+		st.markdown(text) # 요약 결과
+
+		# 지도 표시
+		map_html = f"""
+		    <div id="map" style="width: 100%; height: 500px;"></div>
+
+		    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={NAVER_MAP_CLIENT_ID}"></script>
+
+		    <script>
+		        var mapOptions = {{
+		            zoom: 10
+		        }};
+		        var map = new naver.maps.Map('map', mapOptions);
+		    </script>
+		"""
+		st.components.v1.html(map_html, height=500)
+
 
 
 # 파일 저장 함수
