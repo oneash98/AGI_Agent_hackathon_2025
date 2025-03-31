@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_pdf_viewer import pdf_viewer
+import streamlit.components.v1 as components
 from main import test_function
 import os
 from datetime import datetime
@@ -26,12 +27,12 @@ if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
 if 'last_uploaded_file' not in st.session_state:
 	st.session_state.last_uploaded_file = None
 
-# 네이버 지도 api
+# 구글맵 api
 if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 
 	load_dotenv()
-	NAVER_MAP_CLIENT_ID = os.getenv("NAVER_MAP_CLIENT_ID")
+	GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 else: # 스트림릿 웹에서 실행 시
-	NAVER_MAP_CLIENT_ID = st.secrets["NAVER_MAP_CLIENT_ID"]
+	GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
 
 
 
@@ -54,22 +55,6 @@ def initial_run():
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
 	with container_result:
 		st.markdown(text) # 요약 결과
-
-		# 지도 표시
-		map_html = f"""
-		    <div id="map" style="width: 100%; height: 500px;"></div>
-
-		    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={NAVER_MAP_CLIENT_ID}"></script>
-
-		    <script>
-		        var mapOptions = {{
-		            zoom: 10
-		        }};
-		        var map = new naver.maps.Map('map', mapOptions);
-		    </script>
-		"""
-		st.components.v1.html(map_html, height=500)
-
 
 
 # 파일 저장 함수
@@ -152,3 +137,23 @@ with container_file:
 
 # 결과 보여주는 칸
 container_result = st.container()
+
+
+# 지도 표시
+# HTML 코드로 Google Maps 삽입
+def generate_google_map(lat, lng, zoom=12):
+	return f"""
+	<iframe
+		width="700"
+		height="500"
+		frameborder="0" style="border:0"
+		src="https://www.google.com/maps/embed/v1/view?key={GOOGLE_MAPS_API_KEY}&center={lat},{lng}&zoom={zoom}" allowfullscreen>
+	</iframe>
+	"""
+
+# 사용자 입력으로 위도와 경도 설정
+st.header("Google Maps with API")
+latitude = st.number_input("Enter Latitude", value=37.7749)  # Default: San Francisco
+longitude = st.number_input("Enter Longitude", value=-122.4194)  # Default: San Francisco
+map_html = generate_google_map(latitude, longitude)
+components.html(map_html, height=500)
