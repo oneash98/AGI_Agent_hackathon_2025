@@ -7,6 +7,9 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
+import pandas as pd
+import numpy as np
+from scipy.spatial import KDTree
 
 
 
@@ -41,6 +44,7 @@ if 'has_result' not in st.session_state: # 결과 상태 설정
     st.session_state.has_result = False
     st.session_state.summary_text = ""
 
+df_clinics = pd.read_pickle('data/clinics_info.pkl') # 병원 정보 데이터
 
 
 
@@ -80,6 +84,40 @@ def save_file(uploaded_file):
 		f.write(uploaded_file.getbuffer())
 
 	return file_path
+
+# 병원 찾기 함수
+def search_clinics(specialty, k=3):
+	if user_location['latitude'] == None:
+		with container_result:
+			st.markdown('위치 정보가 필요합니다. 사이드바의 위치 정보 활용 버튼을 클릭해주세요.')
+
+		return None
+	
+	# 위치 정보
+	latitude = user_location['latitude']
+	longitude = user_location['longitude']
+
+	clinics = get_nearest_clinics(longitude, latitude, specialty, k) # 병원 정보
+	with container_result: # 병원 정보 출력
+		for i, row in clinics.iterrows():
+			st.button(row['요양기관명'], on_click=show_map, args=({row['요양기관명']},)) # 병원 이름 클릭 시 지도 표시
+			st.markdown(f"""
+			**주소:** {row['주소']}  
+			**전화번호:** {row['전화번호']}  
+			**홈페이지:** {row['병원홈페이지']}
+			""")
+
+# 가까운 병원 찾기
+def get_nearest_clinics(longitude, latitude, specialty, k):
+	df = df_clinics[df_clinics['진료과'] == specialty]
+	coords = df[['좌표(X)', '좌표(Y)']].values
+	tree = KDTree(coords)
+
+	target = np.array([longitude, latitude])
+	distance, indicies = tree.query(target, k=k)
+
+	return df.iloc[indicies]
+
 
 # 지도 표시 함수
 def show_map(place_name):
@@ -128,6 +166,10 @@ with st.sidebar:
 
 		btn_api_key_submit = st.form_submit_button("Submit", on_click=on_submit)
 
+	# 위치 정보 확인
+	st.markdown("위치 정보 활용을 위해 아래 버튼을 클릭해주세요")
+	user_location = streamlit_geolocation()
+
 
 st.title("뭐라고 적을까요")
 st.subheader('뭐라고 적을까요 2')
@@ -167,68 +209,14 @@ if 'has_result' in st.session_state and st.session_state.has_result:
 		st.subheader("요약 결과")
 		st.markdown(st.session_state.summary_text) 
 
+		# 추천 진료과
+		st.subheader("나에게 맞는 진료과는?")
+		st.markdown("내과")
+
 		# 병원 추천
 		st.subheader("추천 병원") # 추천 병원
-		place_name1 = "신촌연세병원"
-		place_name2 = "신촌세브란스"
+		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = ('내과',))
 
-		st.button(place_name1, on_click=show_map, args=(place_name1,))
-		st.markdown(f"""
-		**주소:** "서울특별시 마포구 서강로 110, 지2층~6층 (신수동)"  
-		**전화번호:** "02-337-7582"  
-		**홈페이지:** "http://www.scys.co.kr"
-		""")
-
-		st.button(place_name2, on_click=show_map, args=(place_name2,))
-		st.markdown(f"""
-		**주소:** "서울특별시 서대문구 연세로 50-1, (신촌동)"  
-		**전화번호:** "02-2228-0114"  
-		**홈페이지:** "http://www.yuhs.or.kr"
-		""")
 
 # 지도 표시 칸
 container_map = st.container()
-
-
-
-
-
-# st.title("GPS 기능을 사용하여 나의 현 위치 확인")
-
-# # 사용자 위치 가져오기
-# location = streamlit_geolocation()
-
-# # 위치 정보 출력
-# if location:
-#     st.write(f"위도: {location['latitude']}")
-#     st.write(f"경도: {location['longitude']}")
-#     st.write(f"정확도: {location['accuracy']}m")
-# else:
-#     st.write("위치를 가져오는 중입니다. 버튼을 눌러 승인하세요.")
-
-
-
-########## CSS ###########
-# style = """
-# <style>
-#     button {
-#         background: none!important;
-#         border: none;
-#         padding: 0!important;
-#         color: black !important;
-#         text-decoration: none;
-#         cursor: pointer;
-#         border: none !important;
-#     }
-#     button:hover {
-#         text-decoration: none;
-#         color: black !important;
-#     }
-#     button:focus {
-#         outline: none !important;
-#         box-shadow: none !important;
-#         color: black !important;
-#     }
-# </style>
-# """
-# st.markdown(style, unsafe_allow_html=True)
