@@ -83,12 +83,13 @@ def save_file(uploaded_file):
 	if not os.path.exists('uploaded_files'):
 		os.makedirs('uploaded_files')
 
-	current_time = datetime.now()
-	current_time = current_time.isoformat().replace(":", "").replace("-", "").replace(".", "")	
-	temp = uploaded_file.name.split('.')
-	file_name = temp[0]
-	file_extension = temp[-1]
-	file_name = "".join([file_name, '_', str(current_time), '.', file_extension])
+	# current_time = datetime.now()
+	# current_time = current_time.isoformat().replace(":", "").replace("-", "").replace(".", "")	
+	# temp = uploaded_file.name.split('.')
+	# file_name = temp[0]
+	# file_extension = temp[-1]
+	# file_name = "".join([file_name, '_', str(current_time), '.', file_extension])
+	file_name = uploaded_file.name
 	file_path = os.path.join('uploaded_files', file_name)
 	with open(file_path, 'wb') as f:
 		f.write(uploaded_file.getbuffer())
