@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_pdf_viewer import pdf_viewer
 from streamlit_geolocation import streamlit_geolocation
-from main import test_function
+from main import return_json_for_test, return_summary_for_test, suggest_specialty
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -42,7 +42,13 @@ if 'last_uploaded_file' not in st.session_state:
 
 if 'has_result' not in st.session_state: # 결과 상태 설정
     st.session_state.has_result = False
-    st.session_state.summary_text = ""
+    st.session_state.summary = ""
+
+if 'health_info' not in st.session_state: # 건강 정보 (JSON) 상태 설정
+	st.session_state.health_info = None
+
+if 'specialty' not in st.session_state: # 추천 진료과 상태 
+	st.session_state.specialty = None
 
 df_clinics = pd.read_pickle('data/clinics_info.pkl') # 병원 정보 데이터
 
@@ -61,12 +67,16 @@ def initial_run():
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
     
 	# API 호출
-	text = test_function(st.session_state.API_KEY, file_path) 
+	health_info = return_json_for_test() # 건강 정보 추출 (JSON)
+	summary = return_summary_for_test() # 요약 정보
+	specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
 	
 	# 세션 상태에 결과 저장
-	st.session_state.summary_text = text
+	st.session_state.health_info = health_info
+	st.session_state.summary = summary
 	st.session_state.has_result = True
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
+	st.session_state.specialty = specialty
 
 # 파일 저장 함수
 def save_file(uploaded_file):
@@ -179,7 +189,7 @@ st.markdown('뭐라고 적을까요 3')
 # 파일 업로드 칸
 container_file = st.container()
 with container_file:
-	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf', 'png', 'jpeg'])
+	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf'])
 
 	# 실행 버튼
 	btn_run = st.button("시작", on_click=initial_run)
@@ -207,15 +217,15 @@ if 'has_result' in st.session_state and st.session_state.has_result:
 	with container_result:
 		# 요약 결과
 		st.subheader("요약 결과")
-		st.markdown(st.session_state.summary_text) 
+		st.markdown(st.session_state.summary) 
 
 		# 추천 진료과
 		st.subheader("나에게 맞는 진료과는?")
-		st.markdown("내과")
+		st.markdown(st.session_state.specialty)
 
 		# 병원 추천
 		st.subheader("추천 병원") # 추천 병원
-		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = ('내과',))
+		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = (st.session_state.specialty,))
 
 
 # 지도 표시 칸
