@@ -1,0 +1,28 @@
+{
+  "short_name": "헬스케어 어시스턴트",
+  "name": "헬스케어 어시스턴트 - AI 건강검진 분석",
+  "description": "AI 기반 건강검진 결과 분석 및 맞춤형 진료과 추천 서비스",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2196f3",
+  "background_color": "#ffffff",
+  "categories": ["healthcare", "medical", "ai", "analysis"],
+  "lang": "ko-KR"
+}

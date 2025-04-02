@@ -3,6 +3,22 @@ from bs4 import BeautifulSoup
 from langchain_upstage import ChatUpstage
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from typing import List
+import json
+
+app = FastAPI()
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # upstage request 오류 확인
 def print_upstage_error(response):
@@ -110,3 +126,21 @@ def suggest_specialty(API_KEY, input_data):
     response = chain.invoke({"input_data": input_data})
     
     return response
+
+@app.post("/api/analyze")
+async def analyze_files(files: List[UploadFile] = File(...)):
+    # 테스트용으로 더미 데이터 반환
+    return {"data": return_json_for_test()}
+
+@app.get("/api/summary")
+async def get_summary():
+    return {"summary": return_summary_for_test()}
+
+@app.post("/api/suggest-specialty")
+async def get_specialty_suggestion(data: dict):
+    API_KEY = "your-api-key"  # 실제 운영시에는 환경변수로 관리
+    response = suggest_specialty(API_KEY, json.dumps(data))
+    return {"suggestion": response}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

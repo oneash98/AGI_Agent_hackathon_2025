@@ -11,7 +11,87 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import KDTree
 
-
+# Custom CSS for modern styling
+st.markdown("""
+<style>
+    /* Main container */
+    .main {
+        padding: 2rem;
+    }
+    
+    /* Headers */
+    .title-text {
+        color: #1E88E5;
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 1.5rem !important;
+    }
+    
+    .subtitle-text {
+        color: #424242;
+        font-size: 1.5rem !important;
+        font-weight: 500 !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    /* Cards */
+    .stCard {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        background-color: white;
+    }
+    
+    /* Buttons */
+    .stButton button {
+        border-radius: 8px;
+        padding: 0.5rem 2rem;
+        background-color: #1E88E5;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton button:hover {
+        background-color: #1565C0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* File uploader */
+    .uploadedFile {
+        border: 2px dashed #1E88E5;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        background-color: #F5F5F5;
+    }
+    
+    /* Results container */
+    .results-container {
+        background-color: #FAFAFA;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+    }
+    
+    /* Hospital cards */
+    .hospital-card {
+        background-color: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Map container */
+    .map-container {
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 1.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 ########## 세션 상태 초기화 ###########
 
@@ -151,83 +231,83 @@ def show_map(place_name):
 
 # 웹 탭 꾸미기
 st.set_page_config(
-    page_title="제목 추천받아요",
+    page_title="AI 건강검진 분석 도우미",
+    page_icon="🏥",
+    layout="wide"
 )
 
 # 사이드바 
 with st.sidebar:
+    st.markdown("### ⚙️ 설정")
+    
+    def on_submit():
+        st.session_state.API_KEY = st.session_state.temp_key
+        temp_chars = list(st.session_state.API_KEY)
+        for i in range(len(temp_chars[4:-1])):
+            temp_chars[i+4] = "*"
+        st.session_state.masked_API_KEY = "".join(temp_chars)
+        st.session_state.temp_key = ""
+    
+    # API key 입력 form
+    with st.form("api_key_form", clear_on_submit=False):
+        st.markdown("#### 🔑 API Key 설정")
+        intput_API_KEY = st.text_input(
+            label = f"현재 API Key: {st.session_state.masked_API_KEY}",
+            placeholder = "Upstage API Key를 입력하세요",
+            key = "temp_key",
+            type="password"
+        )
+        btn_api_key_submit = st.form_submit_button("저장", on_click=on_submit)
 
-	def on_submit(): # API key submit 버튼 클릭 시
-		st.session_state.API_KEY = st.session_state.temp_key # api key
-		# api key 마스킹
-		temp_chars = list(st.session_state.API_KEY)
-		for i in range(len(temp_chars[4:-1])):
-			temp_chars[i+4] = "*"
-		st.session_state.masked_API_KEY = "".join(temp_chars)
+    st.markdown("---")
+    st.markdown("#### 📍 위치 정보")
+    st.markdown("근처 병원 찾기를 위해 위치 정보 제공이 필요합니다.")
+    user_location = streamlit_geolocation()
 
-		st.session_state.temp_key = ""
-	
-	# API key 입력 form
-	with st.form("api_key_form", clear_on_submit=False):
-		intput_API_KEY = st.text_input(
-			label = f"Upstage API Key: {st.session_state.masked_API_KEY}",
-			placeholder = "Upstage API Key를 입력하세요",
-			key = "temp_key",
-		)
+# Main content
+st.markdown('<h1 class="title-text">AI 건강검진 분석 도우미 🏥</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle-text">건강검진 결과를 AI가 분석하여 맞춤형 정보를 제공해드립니다</p>', unsafe_allow_html=True)
 
-		btn_api_key_submit = st.form_submit_button("Submit", on_click=on_submit)
+# 파일 업로드 섹션
+with st.container():
+    st.markdown('<div class="stCard">', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("건강검진 결과 파일을 업로드해주세요 (PDF)", type=['pdf'])
+    
+    if uploaded_file:
+        st.success("파일이 성공적으로 업로드되었습니다!")
+        
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        btn_run = st.button("분석 시작 🔍", on_click=initial_run, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-	# 위치 정보 확인
-	st.markdown("위치 정보 활용을 위해 아래 버튼을 클릭해주세요")
-	user_location = streamlit_geolocation()
+# 결과 표시 섹션
+if st.session_state.has_result:
+    st.markdown('<div class="results-container">', unsafe_allow_html=True)
+    
+    # 요약 정보
+    st.markdown("### 📋 검진 결과 요약")
+    st.info(st.session_state.summary)
+    
+    # 추천 진료과
+    if st.session_state.specialty:
+        st.markdown("### 👨‍⚕️ 추천 진료과")
+        st.success(f"추천 진료과: {st.session_state.specialty}")
+        
+        # 주변 병원 찾기
+        st.markdown("### 🏥 주변 병원 찾기")
+        if st.button("주변 병원 검색"):
+            search_clinics(st.session_state.specialty)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-
-st.title("뭐라고 적을까요")
-st.subheader('뭐라고 적을까요 2')
-st.markdown('뭐라고 적을까요 3')
-
-
-# 파일 업로드 칸
-container_file = st.container()
-with container_file:
-	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf'])
-
-	# 실행 버튼
-	btn_run = st.button("시작", on_click=initial_run)
-	
-	# 파일 업로드 시 파일 첫 페이지 표시
-	if uploaded_file: 
-		if uploaded_file != st.session_state.last_uploaded_file: # 상태 변경
-			st.session_state.viewer_visible = True
-			st.session_state.last_uploaded_file = uploaded_file
-			st.session_state.has_result = False
-
-		if st.session_state.viewer_visible: 
-			if uploaded_file.type == "application/pdf": # pdf 파일일 경우
-				temp = uploaded_file.getvalue()
-				viewer = pdf_viewer(input=temp, pages_to_render=[1])
-			else: # 이미지 파일일 경우
-				image = Image.open(uploaded_file)
-				viewer = st.image(image, use_container_width=True)
-
-# 결과 표시 칸
-container_result = st.container()
-
-if 'has_result' in st.session_state and st.session_state.has_result:
-	# 결과 표시
-	with container_result:
-		# 요약 결과
-		st.subheader("요약 결과")
-		st.markdown(st.session_state.summary) 
-
-		# 추천 진료과
-		st.subheader("나에게 맞는 진료과는?")
-		st.markdown(st.session_state.specialty)
-
-		# 병원 추천
-		st.subheader("추천 병원") # 추천 병원
-		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = (st.session_state.specialty,))
-
-
-# 지도 표시 칸
+# 지도 표시 컨테이너
 container_map = st.container()
+with container_map:
+    st.markdown('<div class="map-container">', unsafe_allow_html=True)
+    # Map will be displayed here when a hospital is selected
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# 파일 뷰어 컨테이너
+container_file = st.container()
+container_result = st.container()
