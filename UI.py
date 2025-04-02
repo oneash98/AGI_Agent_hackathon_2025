@@ -190,7 +190,7 @@ st.markdown('뭐라고 적을까요 3')
 # 파일 업로드 칸
 container_file = st.container()
 with container_file:
-	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf'])
+	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf', 'jpg', 'jpeg', 'png'])
 
 	# 실행 버튼
 	btn_run = st.button("시작", on_click=initial_run)
