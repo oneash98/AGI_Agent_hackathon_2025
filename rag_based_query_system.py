@@ -1,0 +1,125 @@
+from openai import OpenAI
+import numpy as np
+from typing import List, Dict
+import json
+
+class HealthRAGSystem:
+    def __init__(self, api_key: str):
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.upstage.ai/v1"
+        )
+        self.health_status = None
+        self.guidelines_db = []  # This would be your vector database of medical guidelines
+        
+    def load_health_status(self, health_status: Dict):
+        """Load the patient's health status"""
+        self.health_status = health_status
+
+    def preprocess_query(self, query: str) -> str:
+        """Optional query preprocessing"""
+        # For now, just return the original query
+        # You can add keyword extraction or other preprocessing here
+        return query
+
+    def get_embeddings(self, text: str) -> np.ndarray:
+        """Get embeddings using Solar API"""
+        response = self.client.embeddings.create(
+            model="embedding-query",  # Use appropriate embedding model
+            input=text
+        )
+        return np.array(response.data[0].embedding)
+
+    def retrieve_relevant_snippets(self, query: str, top_k: int = 3) -> List[str]:
+        """Retrieve relevant guideline snippets using vector similarity"""
+        query_embedding = self.get_embeddings(query)
+        
+        # Calculate similarities with all guidelines
+        similarities = []
+        for guideline in self.guidelines_db:
+            guideline_embedding = self.get_embeddings(guideline)
+            similarity = np.dot(query_embedding, guideline_embedding)
+            similarities.append((similarity, guideline))
+        
+        # Sort by similarity and get top k
+        similarities.sort(reverse=True)
+        return [snippet for _, snippet in similarities[:top_k]]
+
+    def construct_prompt(self, query: str, relevant_snippets: List[str]) -> str:
+        """Construct the prompt for the LLM"""
+        prompt = f"""[사용자의 건강 검진 결과]를 염두에 두면서 [관련 의료 지침]을 바탕으로 [사용자 질문]에 대한 상세하고 이해하기 쉬운 설명을 제공해주세요. 지침의 범위를 벗어난 질문에는 답변하지 마세요. 
+        #사용자의 건강 검진 결과:{json.dumps(self.health_status, indent=2, ensure_ascii=False)}
+
+        #관련 의료 지침:
+        """
+        for i, snippet in enumerate(relevant_snippets, 1):
+            prompt += f"{i}. {snippet}\n"
+
+        prompt += f"\n#사용자 질문: {query}\n"
+        
+        return prompt
+
+    def generate_response(self, query: str) -> str:
+        """Generate final response using Solar LLM"""
+        # Preprocess query
+        processed_query = self.preprocess_query(query)
+        
+        # Retrieve relevant snippets
+        relevant_snippets = self.retrieve_relevant_snippets(processed_query)
+        
+        # Construct prompt
+        prompt = self.construct_prompt(processed_query, relevant_snippets)
+        
+        # Generate response using Solar
+        response = self.client.chat.completions.create(
+            model="solar-pro",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        return response.choices[0].message.content
+
+# Example usage
+def main():
+    # Initialize the RAG system
+    rag_system = HealthRAGSystem(api_key="up_GuigAOl5bgZmOGMDD3YzlJ5DRSk4Q")
+    
+    # Load health status
+    health_status = {
+        "생년월일": "780203-3",
+        "검진일": "2025년 5월 5일",
+        "검진종합소견": "고혈압 및 당뇨병 전단계 소견",
+        "키": 175,
+        "몸무게": 86.2,
+        "체질량지수": 28.2,
+        "허리둘레": 92.0,
+        "혈압": "145/95 mmHg",
+        "혈색소": "14.2",
+        "빈혈 소견": "정상",
+        "공복혈당": "128",
+        "당뇨병 소견": "공복혈당장애 의심",
+        "총콜레스테롤": "220",
+        "고밀도콜레스테롤": "38",
+        "중성지방": "180",
+        "저밀도콜레스테롤": "148",
+        "이상지질혈증 소견": "이상지질혈증 의심",
+        "혈청크레아티닌": "1.1",
+        "eGFR": "79",
+        "신장질환 소견": "정상",
+        "AST": "35",
+        "ALT": "38",
+        "감마지티피": "60",
+        "간장질환": "경계성 간기능 이상",
+        "요단백": "미량",
+        "흉부촬영": "정상"
+    }
+    rag_system.load_health_status(health_status)
+    
+    # Example query
+    user_query = "고혈압에 좋은 음식이 따로 있나요?"
+    response = rag_system.generate_response(user_query)
+    print("Response:", response)
+
+if __name__ == "__main__":
+    main() 
