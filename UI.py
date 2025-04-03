@@ -95,8 +95,8 @@ def initial_run():
 	def thread_worker(API_KEY, file_path, result_queue):
 		try:
 			health_info = return_json(API_KEY, file_path, result_queue) # 검진 결과 JSON
-			summary = return_summary_for_test() # 핵심 요약
-			simple_explanation = return_simple_explanation(API_KEY, health_info, result_queue) # 친절한 설명
+			summary = return_summary(API_KEY, health_info) # 핵심 요약
+			simple_explanation = return_simple_explanation(API_KEY, health_info, summary, result_queue) # 친절한 설명
 			reason, specialty = suggest_specialty(API_KEY, health_info, summary, result_queue) # 진료과 추천
 		except Exception as e:
 			result_queue.put(("error", str(e)))
