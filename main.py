@@ -231,7 +231,6 @@ def return_simple_explanation(API_KEY, health_info, result_queue):
                 Patient nickname (e.g., 슬기로운고양이)
                 Age group (e.g., 30대), Gender (e.g., 여성)
                 Output Format:
-                {
                     👋 Greeting & Empathy (1 short paragraph)
                     Greet the patient using their nickname. Briefly mention you’ve read their results and will explain gently.
 
@@ -256,7 +255,6 @@ def return_simple_explanation(API_KEY, health_info, result_queue):
                     Older man → 등산, 유산소 운동
                     💬 Friendly Encouragement
                     End with comforting words to support the patient and encourage action.
-                }
                 """
             )
         },
@@ -294,6 +292,63 @@ def return_simple_explanation(API_KEY, health_info, result_queue):
         result_queue.put(("explanation_error", error_message))
         return error_message
 
+
+def return_summary(API_KEY, file_path, health_info):
+    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                """You are MAGIC, a Korean, warm and friendly AI health coach.
+                Your job is to gently explain a patient's health check-up results using friendly language.
+                Focus only on what needs attention. Never use complex medical terms or diagnosis names.
+                Explain in everyday language that is emotionally supportive and easy to understand.
+                Use emojis to make the explanation more friendly and engaging.
+
+                각 항목은 아래의 간략한 기준에 따라 평가해주세요 (반대쪽의 저하 수치도 동일한 단계로 적용):  
+                - **체질량지수 (BMI):** 정상 18.5–24.9, Mild High 25.0–29.9, Severe High ≥30.0  
+                - **허리둘레:** 남성 – 정상 80–89, Mild High 90–99, Severe High ≥100; 여성 – 정상 70–84, Mild High 85–94, Severe High ≥95  
+                - **혈압 (Systolic/Diastolic):** 정상 100–119/70–79, Mild High 120–139/80–89, Severe High ≥140/≥90  
+                - **혈색소:** 남성 – 정상 13.5–17.5, 여성 – 정상 12.0–15.5; 낮거나 높으면 각각 Mild/Severe Low 또는 High로 판단  
+                - **공복혈당:** 정상 70–99, Mild High 100–125, Severe High ≥126  
+                - **총콜레스테롤:** 정상 160–199, Mild High 200–239, Severe High ≥240  
+                - **고밀도콜레스테롤 (HDL):** 남성 – 정상 40–59, 여성 – 정상 50–69; 낮거나 높으면 단계에 따라 평가  
+                - **중성지방:** 정상 90–149, Mild High 150–199, Severe High ≥200  
+                - **저밀도콜레스테롤 (LDL):** 정상 90–119, Mild High 120–159, Severe High ≥160  
+                - **혈청크레아티닌:** 남성 – 정상 0.7–1.3, 여성 – 정상 0.6–1.1  
+                - **eGFR:** 정상 60–89; 낮으면 Mild/Severe Low, 높으면 Mild/Severe High  
+
+                이 요약은 환자와 대화할 떄 계속 기억할 '단기 기억'으로 사용될 것입니다.
+                """
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                #f"Patient's nickname: {health_info.get('별명', '환자')}\n"
+                f"Patient's age: {st.session_state.age}\n"
+                f"Patient's gender: {st.session_state.gender}\n"
+                f"Health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                "위 데이터를 바탕으로, 각 항목별 위험도를 평가하고 환자가 가장 주의해야 할 건강 문제를 간결하게 요약해주세요."
+            )
+        }
+    ]
+    
+    try:
+        # Step 2: Call the Solar LLM using the Upstage API client
+        client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
+        response = client.chat.completions.create(
+            model="solar-pro",
+            messages=messages
+        )
+        
+        # Step 3: Extract the summary text from the response
+        summary_text = response.choices[0].message.content
+        return summary_text
+    except Exception as e:
+        # Return a fallback message if the API call fails
+        print(f"Error in return_summary: {str(e)}")
+        return "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
 def suggest_specialty(API_KEY, health_info, summary, result_queue):

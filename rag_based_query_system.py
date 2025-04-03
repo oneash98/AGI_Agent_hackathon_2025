@@ -81,12 +81,34 @@ class HealthRAGSystem:
         return response.choices[0].message.content
 
 # Example usage
-def main():
+def main(api_key: str, health_status: Dict, user_query: str):
+    """
+    Main function to run the HealthRAGSystem with provided parameters
+    
+    Args:
+        api_key: API key for the OpenAI client
+        health_status: Dictionary containing patient health data
+        user_query: User's health-related question
+    
+    Returns:
+        Response from the RAG system
+    """
     # Initialize the RAG system
-    rag_system = HealthRAGSystem(api_key="up_GuigAOl5bgZmOGMDD3YzlJ5DRSk4Q")
+    rag_system = HealthRAGSystem(api_key=api_key)
     
     # Load health status
-    health_status = {
+    rag_system.load_health_status(health_status)
+    
+    # Generate and return response
+    response = rag_system.generate_response(user_query)
+    print("Response:", response)
+    return response
+
+if __name__ == "__main__":
+    # Example parameters (commented out - would be provided as actual parameters)
+    """
+    Example health_status:
+    {
         "생년월일": "780203-3",
         "검진일": "2025년 5월 5일",
         "검진종합소견": "고혈압 및 당뇨병 전단계 소견",
@@ -114,12 +136,12 @@ def main():
         "요단백": "미량",
         "흉부촬영": "정상"
     }
-    rag_system.load_health_status(health_status)
     
-    # Example query
-    user_query = "고혈압에 좋은 음식이 따로 있나요?"
-    response = rag_system.generate_response(user_query)
-    print("Response:", response)
-
-if __name__ == "__main__":
-    main() 
+    Example user_query: "고혈압에 좋은 음식이 따로 있나요?"
+    """
+    
+    # Sample usage - uncomment and modify as needed
+    # health_data = {...}  # Replace with actual health data
+    # api_key = "your_api_key"
+    # question = "your health question"
+    # main(api_key, health_data, question) 

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from PIL import Image
 import pandas as pd
 import threading, queue, time, random
+from rag_based_query_system import HealthRAGSystem
 
 
 
@@ -58,6 +59,14 @@ if 'reason_for_specialty' not in st.session_state: # 진료과 추천 이유
 
 if 'specialty' not in st.session_state: # 추천 진료과 상태 
 	st.session_state.specialty = None
+
+# 챗봇 상태 초기화
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+
+if 'rag_system' not in st.session_state:
+    st.session_state.rag_system = None
+
 
 df_loading_text = pd.read_csv('data/loading_text.csv', index_col = 'index', encoding='utf-8-sig') # 로딩 시 보여줄 건강 안내 문구
 df_clinics = pd.read_pickle('data/clinics_info2.pkl') # 병원 정보 데이터
@@ -243,7 +252,7 @@ st.markdown('')
 # 사용자 정보 입력 칸
 container_user_info = st.container()
 with container_user_info:
-    st.subheader("기본 정보 입력")
+    st.subheader("기본 정보")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -259,56 +268,110 @@ with container_user_info:
 # 파일 업로드 칸
 container_file = st.container()
 with container_file:
-	uploaded_file = st.file_uploader("파일을 선택하세요", type=['pdf', 'jpg', 'jpeg', 'png'])
+    st.subheader("건강검진 결과 업로드")
+    uploaded_file = st.file_uploader("PDF 또는 이미지 파일을 선택하세요", type=['pdf', 'jpg', 'jpeg', 'png'])
 
-	# 실행 버튼
-	btn_run = st.button("시작", on_click=initial_run)
-	
-	# 파일 업로드 시 파일 첫 페이지 표시
-	if uploaded_file: 
-		if uploaded_file != st.session_state.last_uploaded_file: # 상태 변경
-			st.session_state.viewer_visible = True
-			st.session_state.last_uploaded_file = uploaded_file
-			st.session_state.has_result = False
+    # 실행 버튼
+    btn_run = st.button("분석 시작", on_click=initial_run)
+    
+    # 파일 업로드 시 파일 첫 페이지 표시
+    if uploaded_file: 
+        if uploaded_file != st.session_state.last_uploaded_file: # 상태 변경
+            st.session_state.viewer_visible = True
+            st.session_state.last_uploaded_file = uploaded_file
+            st.session_state.has_result = False
 
-		if st.session_state.viewer_visible: 
-			if uploaded_file.type == "application/pdf": # pdf 파일일 경우
-				temp = uploaded_file.getvalue()
-				viewer = pdf_viewer(input=temp, pages_to_render=[1])
-			else: # 이미지 파일일 경우
-				image = Image.open(uploaded_file)
-				viewer = st.image(image, use_container_width=True)
+        if st.session_state.viewer_visible: 
+            if uploaded_file.type == "application/pdf": # pdf 파일일 경우
+                temp = uploaded_file.getvalue()
+                viewer = pdf_viewer(input=temp, pages_to_render=[1])
+            else: # 이미지 파일일 경우
+                image = Image.open(uploaded_file)
+                viewer = st.image(image, use_container_width=True)
 
 # 결과 표시 칸
 container_result = st.container()
 
 if 'has_result' in st.session_state and st.session_state.has_result:
-	# 결과 표시
-	with container_result:
-		# 친절한 설명
-		st.subheader("건강검진 결과 설명")
-		st.markdown(st.session_state.simple_explanation) 
+    # 결과 표시
+    with container_result:
+        # 친절한 설명
+        st.subheader("건강검진 결과 설명")
+        st.markdown(st.session_state.simple_explanation) 
 
-		# 추천 진료과
-		st.subheader("나에게 맞는 진료과는?")
-		st.markdown(st.session_state.specialty)
-		st.markdown(f"({st.session_state.reason_for_specialty})")
+        # 추천 진료과
+        st.subheader("나에게 맞는 진료과는?")
+        st.markdown(st.session_state.specialty)
+        st.markdown(f"({st.session_state.reason_for_specialty})")
 
-		# 병원 추천
-		st.subheader("추천 병원") # 추천 병원
-		col_geolocation1, col_geolocation2 = st.columns([1, 8])
-		with col_geolocation1:
-			user_location = streamlit_geolocation()
-		with col_geolocation2:
-			st.markdown("위치 정보 활용을 위해 왼쪽 버튼을 클릭해주세요")
-		
-		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = (st.session_state.specialty,))
-		# 위치 정보 확인
+        # 병원 추천
+        st.subheader("추천 병원") # 추천 병원
+        col_geolocation1, col_geolocation2 = st.columns([1, 8])
+        with col_geolocation1:
+            user_location = streamlit_geolocation()
+        with col_geolocation2:
+            st.markdown("위치 정보 활용을 위해 왼쪽 버튼을 클릭해주세요")
+        
+        st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = (st.session_state.specialty,))
+        # 위치 정보 확인
 
 
 
 # 지도 표시 칸
 container_map = st.container()
+
+
+# 구분선 추가
+st.divider()
+
+# 챗봇 섹션
+st.subheader("건강 상담 챗봇")
+st.markdown("건강 검진 결과나 의학적 궁금증에 대해 질문해보세요.")
+
+# 이전 메시지 표시
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# 사용자 입력 받기
+if prompt := st.chat_input("질문을 입력하세요"):
+    # 사용자 메시지 추가
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # 사용자 메시지 표시
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # 챗봇 응답 생성
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        message_placeholder.markdown("🤔 생각 중...")
+        
+        try:
+            if st.session_state.API_KEY and st.session_state.health_info:
+                # rag_based_query_system의 main 함수를 직접 호출하여 응답 생성
+                from rag_based_query_system import main as rag_main
+                response = rag_main(
+                    api_key=st.session_state.API_KEY,
+                    health_status=st.session_state.health_info,
+                    user_query=prompt
+                )
+            else:
+                # 필요한 정보가 없는 경우 기본 응답
+                if not st.session_state.API_KEY:
+                    response = "API 키를 입력해주세요."
+                elif not st.session_state.health_info:
+                    response = "건강 검진 결과를 먼저 업로드해주세요."
+                else:
+                    response = "챗봇 시스템 초기화 중입니다. 잠시 후 다시 시도해주세요."
+        except Exception as e:
+            response = f"오류가 발생했습니다: {str(e)}"
+        
+        message_placeholder.markdown(response)
+    
+    # 응답 저장
+    st.session_state.messages.append({"role": "assistant", "content": response})
+
 
 # CSS 스타일 정의 (로딩 모달 스타일)
 st.markdown("""
