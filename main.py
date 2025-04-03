@@ -284,7 +284,13 @@ def return_json(API_KEY, file_path):
     return extract_information_from_image(API_KEY, file_path)
 
 
-def return_summary_for_test(): #테스트용 함수
+def return_summary_for_test():
+
+    temp = "요약"
+
+    return temp
+
+def return_explanation_for_test(): #테스트용 함수
 
     temp = """
 👋 안녕하세요, 건강한다람쥐님! 검사 결과를 살펴봤어요. 걱정하지 마세요. 함께 차근차근 살펴보도록 해요.
@@ -339,12 +345,12 @@ def return_summary(API_KEY, file_path):
 
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
-def suggest_specialty(API_KEY, input_data):
+def suggest_specialty(API_KEY, health_info, summary):
     llm = ChatUpstage(api_key=API_KEY, model="solar-pro")
     
     prompt_template = """
     당신은 의료 인공지능 챗봇 MAGIC입니다. 
-    환자의 <건강검진 결과>를 분석해, 다음 세 가지 진료과 중 가장 적절한 곳을 1곳 추천하거나, 추천하지 않음:
+    환자의 <건강검진 결과>와 <요약 정보>를 분석해, 다음 진료과 중 가장 적절한 곳을 1곳 추천하거나, 추천하지 않음:
     
     - 가정의학과
     - 내과
@@ -380,13 +386,16 @@ def suggest_specialty(API_KEY, input_data):
     }}
     
     <건강검진 결과>:
-    {input_data}
+    {health_info}
+
+    <요약 정보>:
+    {summary}
     """
     final_prompt = PromptTemplate.from_template(prompt_template)
     output_parser = StrOutputParser()
 
     chain = final_prompt | llm | output_parser
-    response = chain.invoke({"input_data": input_data})
+    response = chain.invoke({"health_info": health_info, "summary": summary})
 
     temp = json.loads(response)
     reason = temp['추천_사유']
@@ -408,4 +417,4 @@ def get_nearest_clinics(clinics_info, longitude, latitude, specialty, k):
     target = np.array([longitude, latitude])
     distance, indicies = tree.query(target, k=k)
     
-    return df.iloc[indicies]
+    return df.iloc[indicies] # df 반환 -> UI 파일에서 화면에 표시

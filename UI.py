@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_pdf_viewer import pdf_viewer
 from streamlit_geolocation import streamlit_geolocation
-from main import return_json_for_test, return_summary_for_test, suggest_specialty, get_nearest_clinics
+from main import return_json_for_test, return_summary, return_summary_for_test, return_explanation_for_test, suggest_specialty, get_nearest_clinics
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -40,10 +40,13 @@ if 'last_uploaded_file' not in st.session_state:
 
 if 'has_result' not in st.session_state: # 결과 상태 설정
     st.session_state.has_result = False
-    st.session_state.summary = ""
+    st.session_state.simple_explanation = ""
 
 if 'health_info' not in st.session_state: # 건강 정보 (JSON) 상태 설정
 	st.session_state.health_info = None
+
+if 'reason_for_specialty' not in st.session_state: # 진료과 추천 이유
+	st.session_state.reason_for_specialty = None
 
 if 'specialty' not in st.session_state: # 추천 진료과 상태 
 	st.session_state.specialty = None
@@ -66,14 +69,16 @@ def initial_run():
     
 	# API 호출
 	health_info = return_json_for_test() # 건강 정보 추출 (JSON)
-	summary = return_summary_for_test() # 요약 정보
-	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
+	summary = return_summary_for_test() # 핵심 요약
+	simple_explanation = return_explanation_for_test() # 친절한 설명
+	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info, summary) # 진료과 추천
 	
 	# 세션 상태에 결과 저장
 	st.session_state.health_info = health_info
-	st.session_state.summary = summary
+	st.session_state.simple_explanation = simple_explanation
 	st.session_state.has_result = True
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
+	st.session_state.reason_for_specialty = reason
 	st.session_state.specialty = specialty
 
 # 파일 저장 함수
@@ -104,7 +109,7 @@ def search_clinics(specialty, k=3):
 
 	if user_location['latitude'] == None:
 		with container_result:
-			st.markdown('위치 정보가 필요합니다. 사이드바의 위치 정보 활용 버튼을 클릭해주세요.')
+			st.markdown('위치 정보가 필요합니다. 위치 정보 활용 버튼을 클릭해주세요.')
 
 		return None
 	
@@ -169,10 +174,6 @@ with st.sidebar:
 
 		btn_api_key_submit = st.form_submit_button("Submit", on_click=on_submit)
 
-	# 위치 정보 확인
-	st.markdown("위치 정보 활용을 위해 아래 버튼을 클릭해주세요")
-	user_location = streamlit_geolocation()
-
 
 st.title("뭐라고 적을까요")
 st.subheader('뭐라고 적을까요 2')
@@ -208,17 +209,26 @@ container_result = st.container()
 if 'has_result' in st.session_state and st.session_state.has_result:
 	# 결과 표시
 	with container_result:
-		# 요약 결과
-		st.subheader("요약 결과")
-		st.markdown(st.session_state.summary) 
+		# 친절한 설명
+		st.subheader("건강검진 결과 설명")
+		st.markdown(st.session_state.simple_explanation) 
 
 		# 추천 진료과
 		st.subheader("나에게 맞는 진료과는?")
 		st.markdown(st.session_state.specialty)
+		st.markdown(f"({st.session_state.reason_for_specialty})")
 
 		# 병원 추천
 		st.subheader("추천 병원") # 추천 병원
+		col_geolocation1, col_geolocation2 = st.columns([1, 8])
+		with col_geolocation1:
+			user_location = streamlit_geolocation()
+		with col_geolocation2:
+			st.markdown("위치 정보 활용을 위해 왼쪽 버튼을 클릭해주세요")
+		
 		st.button("나에게 맞는 병원 찾기", on_click=search_clinics, args = (st.session_state.specialty,))
+		# 위치 정보 확인
+
 
 
 # 지도 표시 칸
