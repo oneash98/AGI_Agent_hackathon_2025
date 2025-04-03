@@ -24,6 +24,13 @@ if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 if 'masked_API_KEY' not in st.session_state:
 	st.session_state.masked_API_KEY = ""
 
+# 사용자 정보
+if 'gender' not in st.session_state:
+	st.session_state.gender = None
+
+if 'age' not in st.session_state:
+	st.session_state.age = None
+
 # 구글맵 api
 if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 
 	load_dotenv()
@@ -62,8 +69,13 @@ def initial_run():
 	if not uploaded_file: # 파일 없을 경우
 		with container_file:
 			st.markdown("파일을 업로드해주세요")
-		return None	
-	
+		return None
+
+	if st.session_state.gender is None or st.session_state.age is None:
+		with container_file:
+			st.markdown("성별과 나이를 입력해주세요")
+		return None
+
 	# 실행
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
 
@@ -180,6 +192,21 @@ st.title("AI 건강검진결과 분석 도우미")
 st.subheader('안녕하세요! 저는 MAGIC이에요.')
 st.markdown('')
 
+# 사용자 정보 입력 칸
+container_user_info = st.container()
+with container_user_info:
+    st.subheader("기본 정보 입력")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        gender = st.radio("성별", ["남성", "여성"], key="gender_input", horizontal=True)
+        if gender:
+            st.session_state.gender = gender
+    
+    with col2:
+        age = st.number_input("나이", min_value=1, max_value=120, step=1, key="age_input")
+        if age > 0:
+            st.session_state.age = age
 
 # 파일 업로드 칸
 container_file = st.container()
