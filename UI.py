@@ -84,7 +84,7 @@ def initial_run():
 	st.subheader("친절한 설명을 준비중이에요")
 	health_info = return_json(st.session_state.API_KEY, file_path)
 	simple_explanation = return_simple_explanation(st.session_state.API_KEY, file_path, health_info)
-	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
+	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info, summary) # 진료과 추천
 	
 	st.session_state.health_info = health_info
 	st.session_state.simple_explanation = simple_explanation
