@@ -8,6 +8,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
 import pandas as pd
+import threading, queue, time, random
 
 
 
@@ -58,8 +59,8 @@ if 'reason_for_specialty' not in st.session_state: # 진료과 추천 이유
 if 'specialty' not in st.session_state: # 추천 진료과 상태 
 	st.session_state.specialty = None
 
+df_loading_text = pd.read_csv('data/loading_text.csv', index_col = 'index', encoding='utf-8-sig') # 로딩 시 보여줄 건강 안내 문구
 df_clinics = pd.read_pickle('data/clinics_info2.pkl') # 병원 정보 데이터
-
 
 
 ########## functions ###########
@@ -75,36 +76,83 @@ def initial_run():
 		with container_file:
 			st.markdown("성별과 나이를 입력해주세요")
 		return None
-
-	# 실행
+	
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
 
-	# API 호출
-	summary = return_summary_for_test() # 핵심 요약
-	st.subheader("친절한 설명을 준비중이에요")
-	health_info = return_json(st.session_state.API_KEY, file_path)
-	simple_explanation = return_simple_explanation(st.session_state.API_KEY, file_path, health_info)
-	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info, summary) # 진료과 추천
+	completion_event = threading.Event() # 스레드 완료 이벤트
+	result_queue = queue.Queue() # 결과 저장용 큐 생성
+
+	# 스레드 실행
+	def thread_worker(API_KEY, file_path, result_queue):
+		try:
+			health_info = return_json(API_KEY, file_path, result_queue) # 검진 결과 JSON
+			summary = return_summary_for_test() # 핵심 요약
+			simple_explanation = return_simple_explanation(API_KEY, health_info, result_queue) # 친절한 설명
+			reason, specialty = suggest_specialty(API_KEY, health_info, summary, result_queue) # 진료과 추천
+		except Exception as e:
+			result_queue.put(("error", str(e)))
+		finally:
+			completion_event.set()
+
+	# API 호출 스레드 시작
+	api_thread = threading.Thread(
+		target=thread_worker,
+		args=(st.session_state.API_KEY, file_path, result_queue)
+	)
+	api_thread.daemon = True
+	api_thread.start()
+
+	# 로딩 표시 영역
+	loading_container = st.empty()
+	start_time = time.time()
+	index = random.randrange(1, 101)
+	last_change = start_time
+
+	# 스레드(LLM 추론) 끝날 때까지 로딩 화면
+	while not completion_event.is_set():
+		current_time = time.time()
+		elapsed = int(current_time - start_time)
+
+		# 7초마다 메시지 변경
+		if current_time - last_change >= 7:
+			index = random.randrange(1, 101)
+			last_change = current_time
+
+		# 로딩 표시 업데이트
+		loading_container.markdown(f"""
+        <div class="loading-box">
+			<h2>친절한 설명을 준비중이에요</h2>
+            <div class="loading-spinner"></div>
+			<p>알고 계셨나요?</p>
+            <p>{df_loading_text.loc[index, 'info']}</p>
+            <p style="font-size: 12px; color: #666;">경과 시간: {elapsed}초</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+		# 짧은 대기 후 상태 확인
+		time.sleep(0.1)
 	
-	st.session_state.health_info = health_info
-	st.session_state.simple_explanation = simple_explanation
-	st.session_state.summary = summary
+	# 로딩 표시 제거
+	loading_container.empty()
+
+	# 결과 수집 및 처리
+	results = {}
+	while not result_queue.empty():
+		key, value = result_queue.get()
+		results[key] = value
+	
+	st.session_state.health_info = results['health_info']
+	st.session_state.simple_explanation = results['simple_explanation']
+	# st.session_state.summary = summary
 	st.session_state.has_result = True
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
-	st.session_state.reason_for_specialty = reason
-	st.session_state.specialty = specialty
+	st.session_state.reason_for_specialty = results['reason']
+	st.session_state.specialty = results['specialty']
 
 # 파일 저장 함수
 def save_file(uploaded_file):
 	if not os.path.exists('uploaded_files'):
 		os.makedirs('uploaded_files')
-
-	# current_time = datetime.now()
-	# current_time = current_time.isoformat().replace(":", "").replace("-", "").replace(".", "")	
-	# temp = uploaded_file.name.split('.')
-	# file_name = temp[0]
-	# file_extension = temp[-1]
-	# file_name = "".join([file_name, '_', str(current_time), '.', file_extension])
 	file_name = uploaded_file.name
 	file_path = os.path.join('uploaded_files', file_name)
 	with open(file_path, 'wb') as f:
@@ -161,7 +209,7 @@ def show_map(place_name):
 
 # 웹 탭 꾸미기
 st.set_page_config(
-    page_title="제목 추천받아요",
+    page_title="AI 건강검진결과 분석 도우미 - MAGIC",
 )
 
 # 사이드바 
@@ -261,3 +309,30 @@ if 'has_result' in st.session_state and st.session_state.has_result:
 
 # 지도 표시 칸
 container_map = st.container()
+
+# CSS 스타일 정의 (로딩 모달 스타일)
+st.markdown("""
+<style>
+    .loading-box {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        margin: 20px 0;
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+""", unsafe_allow_html=True)

@@ -13,7 +13,7 @@ def encode_image_to_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def return_json(API_KEY, file_path):
+def return_json(API_KEY, file_path, result_queue):
     schema_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction/schema-generation")
     # Encode the image
     encoded_image = encode_image_to_base64(file_path)
@@ -176,6 +176,7 @@ def return_json(API_KEY, file_path):
 
     # --- Step 3: Print or process the result ---
     extracted_data = json.loads(extraction_response.choices[0].message.content)
+    result_queue.put(("health_info", extracted_data))
     return extracted_data
 
 # upstage request 오류 확인
@@ -205,111 +206,14 @@ def test_function(API_KEY, file_path):
     return text
 
 
-
-# 개발용 예시 데이터
-test_data = """
-{
-"나이": 30대,
-"별명": 건강한다람쥐,
-"성별": 여성,
-"키": 158,
-"몸무게": 65.4,
-"체질량지수": 26.2,
-"허리둘레": 86.0,
-"혈압": "135/88 mmHg",
-"혈색소": "12.6",
-"빈혈 소견": "정상",
-"공복혈당": "108",
-"당뇨병 소견": "공복혈당장애 의심",
-"총콜레스테롤": "198",
-"고밀도콜레스테롤": "55",
-"중성지방": "140",
-"저밀도콜레스테롤": "115",
-"이상지질혈증 소견": "정상",
-"혈청크레아티닌": "1.5",
-"eGFR": "48",
-"신장질환 소견": "만성 신장병 의심",
-"AST": "55",
-"ALT": "62",
-"감마지티피": "85",
-"간장질환": "지속적 간기능 이상",
-"요단백": "양성(1+)",
-"흉부촬영": "정상"
-}
-"""
-test_data2 = """
-- **환자 기본 정보**: 1966년생 여성, 2025년 6월 12일 기준 만 58세
-
-- **의무기록 전문**:
-
-환자는 2025년 6월 12일 시행한 건강검진 상 신장기능 저하 및 간기능 이상 소견을 보임.  
-
-1. **체격 및 신체 계측**
-   - 키 158 cm, 몸무게 65.4 kg, 체질량지수(BMI) 26.2 kg/m²로 과체중 범주(25.0–29.9)에 해당.
-   - 허리둘레 86.0 cm로 복부비만 기준(여성 85 cm 이상)에 미달.
-
-2. **대사계 검사**
-   - 공복혈당 108 mg/dL로 공복혈당장애(IFG: 100–125 mg/dL) 범주이며, 당뇨병 전단계에 해당함.
-   - 지질 프로파일:
-     - 총콜레스테롤 198 mg/dL로 정상범위(<200 mg/dL) 내.
-     - LDL 콜레스테롤 115 mg/dL (정상범위: <130 mg/dL)
-     - HDL 콜레스테롤 55 mg/dL (여성 ≥50 mg/dL)
-     - 중성지방 140 mg/dL (정상범위: <150 mg/dL)
-   - 이상지질혈증 관련 소견 없음.
-
-3. **혈액학 검사**
-   - 혈색소(Hb) 12.6 g/dL로 여성 정상범위(12.0–16.0 g/dL)에 해당하며 빈혈 소견 없음.
-
-4. **순환기계 검사**
-   - 혈압 135/88 mmHg로 정상범위(수축기혈압 <130 mmHg, 이완기혈압 <85 mmHg)에 근접하였으며, 고혈압 전단계 주의 요망.
-
-5. **신장기능 검사**
-   - 혈청 크레아티닌(Cr) 1.5 mg/dL로 정상범위(0.7–1.2 mg/dL)를 상회.
-   - eGFR 48 mL/min/1.73㎡로 만성 신장병 기준(<60 mL/min/1.73㎡)에 해당하며, 만성 신장병 의심.
-   - 요단백 검사 결과 양성(1+)으로 단백뇨 소견 있음.
-
-6. **간기능 검사**
-   - AST 55 IU/L, ALT 62 IU/L, γ-GTP 85 IU/L로 모두 정상범위(AST/ALT ≤40 IU/L, γ-GTP ≤50 IU/L)를 상회.
-   - 간장질환 관련 소견: 지속적 간기능 이상 의심.
-
-7. **영상검사**
-   - 흉부 X-ray 검사상 폐야 청정하며 심장, 흉곽 구조물 등 특이소견 없음.
-
----
-
-환자는 신장기능 저하 및 간기능 이상 소견을 보임. 정기적인 추적 관찰 및 생활습관 개선, 식이요법, 운동 등 적극적인 관리가 요망됨.
-"""
-
-def return_json_for_test(): # 테스트용 함수
-
-    return test_data
-
-
 def return_summary_for_test():
 
     temp = "요약"
 
     return temp
 
-def return_explanation_for_test(): #테스트용 함수
 
-    temp = """
-👋 안녕하세요, 건강한다람쥐님! 검사 결과를 살펴봤어요. 걱정하지 마세요. 함께 차근차근 살펴보도록 해요.
-
-📌 주요 사항: 혈당, 신장 기능, 간 기능
-
-🔍 자세한 설명:
-
-* 혈당: 공복 혈당이 높은 편이에요. 이는 혈당을 조절하는 데 주의가 필요함을 의미해요. 과일, 채소와 같은 건강한 탄수화물을 선택하고, 규칙적인 운동을 통해 혈당을 관리할 수 있어요.
-(생략)
-
-✅ 생활습관 팁:
-(생략)
-
-"""
-    return temp
-
-def return_simple_explanation(API_KEY, file_path, health_info):
+def return_simple_explanation(API_KEY, health_info, result_queue):
     # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
     messages = [
         {
@@ -380,15 +284,19 @@ def return_simple_explanation(API_KEY, file_path, health_info):
         
         # Step 3: Extract the summary text from the response
         summary_text = response.choices[0].message.content
+        result_queue.put(("simple_explanation", summary_text))
         return summary_text
+    
     except Exception as e:
         # Return a fallback message if the API call fails
         print(f"Error in return_summary: {str(e)}")
-        return "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
+        error_message = "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
+        result_queue.put(("explanation_error", error_message))
+        return error_message
 
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
-def suggest_specialty(API_KEY, health_info, summary):
+def suggest_specialty(API_KEY, health_info, summary, result_queue):
     llm = ChatUpstage(api_key=API_KEY, model="solar-pro")
     
     prompt_template = """
@@ -444,6 +352,8 @@ def suggest_specialty(API_KEY, health_info, summary):
     reason = temp['추천_사유']
     specialty = temp['추천_진료과']
     
+    result_queue.put(("reason", reason))
+    result_queue.put(("specialty", specialty))
     return reason, specialty
 
 
