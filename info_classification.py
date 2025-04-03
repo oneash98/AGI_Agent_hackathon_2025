@@ -208,5 +208,110 @@ def test_function(API_KEY, file_path):
 
 # 개발용 예시 데이터 ------------------------------------------------------------------------------------------------------------------
 
-API_KEY = "" # 테스트용 API 키
+API_KEY = "up_dcseVnD61Oe3olPjywOM5inoFr0Hn" # 테스트용 API 키
 file_path = "./data/test_image.jpg" # 테스트용 파일 경로
+
+extract_result = extract_information_from_image(API_KEY, file_path)
+print(extract_result)
+# {'키': 184, '몸무게': 98.8, '체질량지수': 29.2, '허리둘레': 88.3, '혈압': '119/ 77 mmHg', '혈색소': '13.4', '빈혈 소견': '정상', '공복혈당': '122', '당뇨병 소견': '공복혈당장애 의심', '총콜레스테롤': '188', '고밀도콜레스테롤': '70', '중성지방': '80', '저밀도콜레스테롤': '111', '이상지질혈증 소견': '정상', '혈청크레아티닌': '0.8', 'eGFR': '84', '신장질환 소견': '정상', 'AST': '25', 'ALT': '21', '감마지티피': '12', '간장질환': '정상', '요단백': '정상', '흉부촬영': '정상', '과거병력': '무', '약물치료병력': '무'}
+
+
+# info_classification 함수 -> 확인해보기!!
+
+# 1. 정상 비정상 데이터 셋팅
+def classify_health_data(data):
+    # 정상 범위 정의
+    normal_ranges = {
+        "키": (140, 200),  # cm
+        "몸무게": (40, 150),  # kg
+        "체질량지수": (18.5, 24.9),  # BMI
+        "허리둘레": (60, 100),  # cm
+        "혈압": lambda x: 90 <= int(x.split('/')[0]) <= 120 and 60 <= int(x.split('/')[1].split()[0]) <= 80,  # mmHg
+        "혈색소": (12.0, 16.0),  # g/dL
+        "공복혈당": (70, 100),  # mg/dL
+        "총콜레스테롤": (0, 200),  # mg/dL
+        "고밀도콜레스테롤": (40, 60),  # mg/dL
+        "중성지방": (0, 150),  # mg/dL
+        "저밀도콜레스테롤": (0, 130),  # mg/dL
+        "혈청크레아티닌": (0.6, 1.2),  # mg/dL
+        "AST": (0, 40),  # IU/L
+        "ALT": (0, 40),  # IU/L
+        "감마지티피": (0, 50),  # IU/L
+    }
+
+    # eGFR 정상 범위 계산 함수 (나이에 따라 동적 설정)
+    def calculate_egfr_range(age):
+        if age < 40:
+            return (90, 120)  # 젊은 성인
+        elif 40 <= age <= 65:
+            return (60, 120)  # 중년
+        else:
+            return (45, 120)  # 고령
+
+    # 결과 저장용 딕셔너리
+    normal = {}
+    abnormal = {}
+
+    # 데이터 분류
+    for key, value in data.items():
+        if key == "eGFR":
+            # 나이에 따라 eGFR 정상 범위 계산
+            age = int(data.get("나이", 50))  # 기본값 50세
+            egfr_range = calculate_egfr_range(age)
+            is_normal = egfr_range[0] <= float(value) <= egfr_range[1]
+        elif key in normal_ranges:
+            range_check = normal_ranges[key]
+            if callable(range_check):  # 혈압처럼 함수로 정의된 경우
+                is_normal = range_check(value)
+            else:  # 범위로 정의된 경우
+                is_normal = range_check[0] <= float(value) <= range_check[1]
+        else:
+            # 기타 소견은 그대로 분류
+            if value == "정상":
+                is_normal = True
+            else:
+                is_normal = False
+
+        # 결과 저장
+        if is_normal:
+            normal[key] = value
+        else:
+            abnormal[key] = value
+
+    return {"정상": normal, "비정상": abnormal}
+
+
+# 테스트 데이터
+data = {
+    '키': 184,
+    '몸무게': 98.8,
+    '체질량지수': 29.2,
+    '허리둘레': 88.3,
+    '혈압': '119/ 77 mmHg',
+    '혈색소': '13.4',
+    '빈혈 소견': '정상',
+    '공복혈당': '122',
+    '당뇨병 소견': '공복혈당장애 의심',
+    '총콜레스테롤': '188',
+    '고밀도콜레스테롤': '70',
+    '중성지방': '80',
+    '저밀도콜레스테롤': '111',
+    '이상지질혈증 소견': '정상',
+    '혈청크레아티닌': '0.8',
+    'eGFR': '84',
+    '신장질환 소견': '정상',
+    'AST': '25',
+    'ALT': '21',
+    '감마지티피': '12',
+    '간장질환': '정상',
+    '요단백': '정상',
+    '흉부촬영': '정상',
+    '과거병력': '무',
+    '약물치료병력': '무',
+    '나이': 50  # 추가된 나이 데이터
+}
+
+# 함수 실행
+result = classify_health_data(data)
+print("정상:", result["정상"])
+print("비정상:", result["비정상"])
