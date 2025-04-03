@@ -222,11 +222,10 @@ def return_simple_explanation(API_KEY, health_info, summary, result_queue):
                 Input:
 
                 Doctor's health check-up summary (written in Korean)
-                Patient nickname (e.g., 슬기로운고양이)
                 Age group (e.g., 30대), Gender (e.g., 여성)
                 Output Format:
                     👋 Greeting & Empathy (1 short paragraph)
-                    Greet the patient using their nickname. Briefly mention you’ve read their results and will explain gently.
+                    Greet the patient. Briefly mention you’ve read their results and will explain gently.
 
                     📌 Health Summary (2–3 sentences max)
                     Summarize the main areas that need attention. Keep it short and focused.
