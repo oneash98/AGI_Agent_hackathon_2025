@@ -21,7 +21,7 @@ if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 		load_dotenv()
 		st.session_state.API_KEY = os.getenv("API_KEY")
 	else: # 스트림릿 웹에서 실행 시
-		st.session_state.API_KEY = ""
+		st.session_state.API_KEY = st.secrets["API_KEY"]
 
 if 'masked_API_KEY' not in st.session_state:
 	st.session_state.masked_API_KEY = ""
@@ -221,28 +221,28 @@ st.set_page_config(
     page_title="AI 건강검진결과 분석 도우미 - MAGIC",
 )
 
-# 사이드바 
-with st.sidebar:
+# # 사이드바 
+# with st.sidebar:
 
-	def on_submit(): # API key submit 버튼 클릭 시
-		st.session_state.API_KEY = st.session_state.temp_key # api key
-		# api key 마스킹
-		temp_chars = list(st.session_state.API_KEY)
-		for i in range(len(temp_chars[4:-1])):
-			temp_chars[i+4] = "*"
-		st.session_state.masked_API_KEY = "".join(temp_chars)
+# 	def on_submit(): # API key submit 버튼 클릭 시
+# 		st.session_state.API_KEY = st.session_state.temp_key # api key
+# 		# api key 마스킹
+# 		temp_chars = list(st.session_state.API_KEY)
+# 		for i in range(len(temp_chars[4:-1])):
+# 			temp_chars[i+4] = "*"
+# 		st.session_state.masked_API_KEY = "".join(temp_chars)
 
-		st.session_state.temp_key = ""
+# 		st.session_state.temp_key = ""
 	
-	# API key 입력 form
-	with st.form("api_key_form", clear_on_submit=False):
-		intput_API_KEY = st.text_input(
-			label = f"Upstage API Key: {st.session_state.masked_API_KEY}",
-			placeholder = "Upstage API Key를 입력하세요",
-			key = "temp_key",
-		)
+# 	# API key 입력 form
+# 	with st.form("api_key_form", clear_on_submit=False):
+# 		intput_API_KEY = st.text_input(
+# 			label = f"Upstage API Key: {st.session_state.masked_API_KEY}",
+# 			placeholder = "Upstage API Key를 입력하세요",
+# 			key = "temp_key",
+# 		)
 
-		btn_api_key_submit = st.form_submit_button("Submit", on_click=on_submit)
+# 		btn_api_key_submit = st.form_submit_button("Submit", on_click=on_submit)
 
 
 st.title("AI 건강검진결과 분석 도우미")
