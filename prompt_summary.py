@@ -43,33 +43,21 @@ test_data = """
 }
 """
 
-def return_json_for_test(): # 테스트용 함수
-
-    return test_data
-
 def return_json(API_KEY, file_path):
     # Instead of returning test data, use the real extraction function:
     return main.extract_information_from_image(API_KEY, file_path)
 
-def return_summary_for_test(): #테스트용 함수
+def return_summary_format(): #테스트용 함수
 
     temp = """
-👋 안녕하세요, 건강한다람쥐님! 검사 결과를 살펴봤어요. 걱정하지 마세요. 함께 차근차근 살펴보도록 해요.
+👋 안녕하세요, 검사 결과를 살펴봤어요. 먼저 간단하게 건강검사 결과를 요약해드릴게요.
 
-📌 주요 사항: 혈당, 신장 기능, 간 기능
+✅ 잘 관리가 되고 있는 항목: 
 
-🔍 자세한 설명:
-
-* 혈당: 공복 혈당이 높은 편이에요. 이는 혈당을 조절하는 데 주의가 필요함을 의미해요. 과일, 채소와 같은 건강한 탄수화물을 선택하고, 규칙적인 운동을 통해 혈당을 관리할 수 있어요.
-(생략)
-
-✅ 생활습관 팁:
-(생략)
+📌 관리가 필요한 항목:
 
 """
     return temp
-
-# return_summary_for_test()
 
 def return_summary(API_KEY, file_path):
     # Step 1: Extract health information from the image
@@ -90,7 +78,8 @@ def return_summary(API_KEY, file_path):
             "role": "user",
             "content": (
                 f"Here is the health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
-                "Please provide an easy-to-understand summary focusing on key aspects that need attention."
+                "Please provide an easy-to-understand summary focusing on key aspects that need attention by using Korean.\n"
+                f"Please provide a summary in the following format: {return_summary_format()}\n"
             )
         }
     ]
@@ -108,7 +97,7 @@ def return_summary(API_KEY, file_path):
     # Extract the summary text from the response
     for chunk in stream:
         if chunk.choices[0].delta.content is not None:
-            print(chunk.choices[0].delta.content, end='')
+            # print(chunk.choices[0].delta.content, end='')
             # Append the content to the final response
             final_response += chunk.choices[0].delta.content
 
