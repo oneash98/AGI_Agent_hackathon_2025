@@ -180,7 +180,7 @@ def extract_information_from_image(API_KEY, file_path):
     extracted_data = json.loads(extraction_response.choices[0].message.content)
     return extracted_data
 
-# A = extract_information_from_image(API_KEY, file_path)
+# extract_information_from_image(API_KEY, file_path)
 
 # upstage request 오류 확인
 def print_upstage_error(response):
@@ -207,8 +207,6 @@ def test_function(API_KEY, file_path):
     text = soup.find(attrs = {'id': '20'}).text
 
     return text
-
-# test_function(API_KEY, file_path)
 
 # 개발용 예시 데이터 ------------------------------------------------------------------------------------------------------------------
 
@@ -246,6 +244,7 @@ test_data = """
 }
 """
 
+# 2. 검사 결과 요약을 위한 함수 ----------------------------------------------------------------------------------------------------------------
 
 def return_json_for_test(): # 테스트용 함수
 
@@ -254,9 +253,6 @@ def return_json_for_test(): # 테스트용 함수
 def return_json(API_KEY, file_path):
     # Instead of returning test data, use the real extraction function:
     return extract_information_from_image(API_KEY, file_path)
-
-
-# 2. 검사 결과 요약을 위한 함수 ----------------------------------------------------------------------------------------------------------------
 
 def return_summary_for_test(): #테스트용 함수
 
