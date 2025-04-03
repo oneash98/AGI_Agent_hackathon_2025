@@ -10,46 +10,51 @@ from openai import OpenAI
 # 기존 파일
 import main
 
-
-# 개발용 예시 데이터
-test_data = """
-{
-"나이": 30대,
-"별명": 건강한다람쥐,
-"성별": 여성,
-"키": 158,
-"몸무게": 65.4,
-"체질량지수": 26.2,
-"허리둘레": 86.0,
-"혈압": "135/88 mmHg",
-"혈색소": "12.6",
-"빈혈 소견": "정상",
-"공복혈당": "108",
-"당뇨병 소견": "공복혈당장애 의심",
-"총콜레스테롤": "198",
-"고밀도콜레스테롤": "55",
-"중성지방": "140",
-"저밀도콜레스테롤": "115",
-"이상지질혈증 소견": "정상",
-"혈청크레아티닌": "1.5",
-"eGFR": "48",
-"신장질환 소견": "만성 신장병 의심",
-"AST": "55",
-"ALT": "62",
-"감마지티피": "85",
-"간장질환": "지속적 간기능 이상",
-"요단백": "양성(1+)",
-"흉부촬영": "정상"
-}
-"""
-
 def return_json(API_KEY, file_path):
     # Instead of returning test data, use the real extraction function:
     return main.extract_information_from_image(API_KEY, file_path)
 
+# 새로 정의한 함수------------------------------------------------------------------------------------------------
+
+def return_normal_standard(age=None):  # age를 매개변수로 받음
+    # 정상 범위 정의
+    normal_ranges = {
+        "키": (0, 300),  # cm
+        "몸무게": (40, 150),  # kg
+        "체질량지수": (18.5, 24.9),  # BMI
+        "허리둘레": (60, 100),  # cm
+        "혈압": lambda x: 90 <= int(x.split('/')[0]) <= 120 and 60 <= int(x.split('/')[1].split()[0]) <= 80,  # mmHg
+        "혈색소": (7.4, 16.0),  # g/dL
+        "공복혈당": (70, 100),  # mg/dL
+        "총콜레스테롤": (120, 200),  # mg/dL
+        "고밀도콜레스테롤": (40, 60),  # mg/dL
+        "중성지방": (40, 150),  # mg/dL
+        "저밀도콜레스테롤": (0, 130),  # mg/dL
+        "혈청크레아티닌": (0.6, 1.2),  # mg/dL
+        "AST": (0, 40),  # IU/L
+        "ALT": (0, 40),  # IU/L
+        "감마지티피": (8, 63),  # IU/L
+        "eGFR": (60, 120) #50세 기준
+    }
+
+    # eGFR 정상 범위 계산 함수 (나이에 따라 동적 설정)
+    def calculate_egfr_range(age):
+        if age < 40:
+            return (90, 120)  # 젊은 성인
+        elif 40 <= age <= 65:
+            return (60, 120)  # 중년
+        else:
+            return (45, 120)  # 고령자
+
+    # age가 제공된 경우 eGFR 범위를 동적으로 추가
+    if age is not None:
+        normal_ranges["eGFR"] = calculate_egfr_range(age)
+
+    return normal_ranges
+
 def return_summary_format(): #테스트용 함수
 
-    temp = """
+    format = """
 👋 안녕하세요, 검사 결과를 살펴봤어요. 먼저 간단하게 건강검사 결과를 요약해드릴게요.
 
 ✅ 잘 관리가 되고 있는 항목: 
@@ -57,12 +62,12 @@ def return_summary_format(): #테스트용 함수
 📌 관리가 필요한 항목:
 
 """
-    return temp
+    return format
 
-def return_summary(API_KEY, file_path):
+def return_summary(API_KEY, file_path, age=None):
     # Step 1: Extract health information from the image
     health_info = return_json(API_KEY, file_path)
-    
+
     # Step 2: Define the conversation for Solar LLM using the provided prompt for an easy summary
     msg = [
         {
@@ -71,7 +76,8 @@ def return_summary(API_KEY, file_path):
                 "You are Dr. 소라, a warm and friendly AI health coach.\n"
                 "Your job is to gently explain a patient's health check-up results using soft and clear language.\n"
                 "Focus only on what needs attention. Never use complex medical terms or diagnosis names.\n"
-                "Explain in everyday language that is emotionally supportive and easy to understand."
+                "Explain in everyday language that is emotionally supportive and easy to understand.\n"
+                f"Please check following standards that determines whether check-up results are normal or not: {return_normal_standard()}\n"
             )
         },
         {
@@ -104,4 +110,4 @@ def return_summary(API_KEY, file_path):
     # summary_text = response.choices[0].message['content']
     return final_response
 
-return_summary(API_KEY, file_path)
+# return_summary(API_KEY, file_path, age=30)
