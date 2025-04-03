@@ -2,14 +2,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_pdf_viewer import pdf_viewer
 from streamlit_geolocation import streamlit_geolocation
-from main import return_json_for_test, return_summary_for_test, suggest_specialty
+from main import return_json_for_test, return_summary_for_test, suggest_specialty, get_nearest_clinics
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
 import pandas as pd
-import numpy as np
-from scipy.spatial import KDTree
 
 
 
@@ -50,7 +48,7 @@ if 'health_info' not in st.session_state: # 건강 정보 (JSON) 상태 설정
 if 'specialty' not in st.session_state: # 추천 진료과 상태 
 	st.session_state.specialty = None
 
-df_clinics = pd.read_pickle('data/clinics_info.pkl') # 병원 정보 데이터
+df_clinics = pd.read_pickle('data/clinics_info2.pkl') # 병원 정보 데이터
 
 
 
@@ -69,7 +67,7 @@ def initial_run():
 	# API 호출
 	health_info = return_json_for_test() # 건강 정보 추출 (JSON)
 	summary = return_summary_for_test() # 요약 정보
-	specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
+	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
 	
 	# 세션 상태에 결과 저장
 	st.session_state.health_info = health_info
@@ -98,6 +96,12 @@ def save_file(uploaded_file):
 
 # 병원 찾기 함수
 def search_clinics(specialty, k=3):
+	if specialty == '해당없음':
+		with container_result:
+			st.markdown('추천 진료 병원이 없습니다.')
+
+		return None
+
 	if user_location['latitude'] == None:
 		with container_result:
 			st.markdown('위치 정보가 필요합니다. 사이드바의 위치 정보 활용 버튼을 클릭해주세요.')
@@ -108,7 +112,7 @@ def search_clinics(specialty, k=3):
 	latitude = user_location['latitude']
 	longitude = user_location['longitude']
 
-	clinics = get_nearest_clinics(longitude, latitude, specialty, k) # 병원 정보
+	clinics = get_nearest_clinics(df_clinics, longitude, latitude, specialty, k) # 병원 정보
 	with container_result: # 병원 정보 출력
 		for i, row in clinics.iterrows():
 			st.button(row['요양기관명'], on_click=show_map, args=({row['요양기관명']},)) # 병원 이름 클릭 시 지도 표시
@@ -117,18 +121,6 @@ def search_clinics(specialty, k=3):
 			**전화번호:** {row['전화번호']}  
 			**홈페이지:** {row['병원홈페이지']}
 			""")
-
-# 가까운 병원 찾기
-def get_nearest_clinics(longitude, latitude, specialty, k):
-	df = df_clinics[df_clinics['진료과'] == specialty]
-	coords = df[['좌표(X)', '좌표(Y)']].values
-	tree = KDTree(coords)
-
-	target = np.array([longitude, latitude])
-	distance, indicies = tree.query(target, k=k)
-
-	return df.iloc[indicies]
-
 
 # 지도 표시 함수
 def show_map(place_name):
