@@ -278,11 +278,6 @@ st.divider()
 st.subheader("건강 상담 챗봇")
 st.markdown("건강 검진 결과나 의학적 궁금증에 대해 질문해보세요.")
 
-# API 키가 입력되었고, 건강 정보가 있는 경우 RAG 시스템 초기화
-if st.session_state.API_KEY and st.session_state.health_info and st.session_state.rag_system is None:
-    st.session_state.rag_system = HealthRAGSystem(api_key=st.session_state.API_KEY)
-    st.session_state.rag_system.load_health_status(st.session_state.health_info)
-
 # 이전 메시지 표시
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -303,12 +298,16 @@ if prompt := st.chat_input("질문을 입력하세요"):
         message_placeholder.markdown("🤔 생각 중...")
         
         try:
-            if st.session_state.rag_system and st.session_state.health_info:
-                # RAG 시스템을 사용하여 응답 생성
-                response = st.session_state.rag_system.generate_response(prompt)
-                # RAG 사용한 과정 log로 표현
+            if st.session_state.API_KEY and st.session_state.health_info:
+                # rag_based_query_system의 main 함수를 직접 호출하여 응답 생성
+                from rag_based_query_system import main as rag_main
+                response = rag_main(
+                    api_key=st.session_state.API_KEY,
+                    health_status=st.session_state.health_info,
+                    user_query=prompt
+                )
             else:
-                # RAG 시스템이 없는 경우 기본 응답
+                # 필요한 정보가 없는 경우 기본 응답
                 if not st.session_state.API_KEY:
                     response = "API 키를 입력해주세요."
                 elif not st.session_state.health_info:
