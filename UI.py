@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_pdf_viewer import pdf_viewer
 from streamlit_geolocation import streamlit_geolocation
-from main import return_json_for_test, return_summary_for_test, suggest_specialty, get_nearest_clinics
+from main import return_json, return_simple_summary, return_summary_for_test, suggest_specialty, get_nearest_clinics
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -59,19 +59,24 @@ def initial_run():
 	if not uploaded_file: # 파일 없을 경우
 		with container_file:
 			st.markdown("파일을 업로드해주세요")
-		return None
-
+		return None	
+	
 	# 실행
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
-    
+
 	# API 호출
-	health_info = return_json_for_test() # 건강 정보 추출 (JSON)
-	summary = return_summary_for_test() # 요약 정보
+	# health_info = return_json_for_test()  # 건강 정보 추출 (JSON)
+	# 새로 추가된 코드: 수정된 extract_information_from_image 함수로 건강 정보 추출
+	st.subheader("친절한 설명을 준비중이에요")
+	health_info = return_json(st.session_state.API_KEY, file_path)
+	summary_simple = return_simple_summary(st.session_state.API_KEY, file_path, health_info)
+
+	# summary = return_summary_for_test() # 요약 정보 - 테스트용 코드 제거
 	reason, specialty = suggest_specialty(st.session_state.API_KEY, health_info) # 진료과 추천
 	
-	# 세션 상태에 결과 저장
 	st.session_state.health_info = health_info
-	st.session_state.summary = summary
+	# st.session_state.summary = summary # 테스트용 코드 제거
+	st.session_state.summary = summary_simple
 	st.session_state.has_result = True
 	st.session_state.viewer_visible = False # 파일 뷰어 끄기
 	st.session_state.specialty = specialty
@@ -174,9 +179,9 @@ with st.sidebar:
 	user_location = streamlit_geolocation()
 
 
-st.title("뭐라고 적을까요")
-st.subheader('뭐라고 적을까요 2')
-st.markdown('뭐라고 적을까요 3')
+st.title("AI 건강검진결과 분석 도우미")
+st.subheader('안녕하세요! 저는 MAGIC이에요.')
+st.markdown('')
 
 
 # 파일 업로드 칸

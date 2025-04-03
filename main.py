@@ -13,10 +13,17 @@ def encode_image_to_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def extract_information_from_image(API_KEY, file_path):
+def return_json(API_KEY, file_path):
+    schema_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction/schema-generation")
     # Encode the image
     encoded_image = encode_image_to_base64(file_path)
     
+    schema_response = schema_client.chat.completions.create(
+        model="information-extract",
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
+        ]}],
+    )
     # Define your schema (or use a pre-generated one)
     schema = {
         "type": "json_schema",
@@ -157,19 +164,17 @@ def extract_information_from_image(API_KEY, file_path):
         }
     }
     
-    # Create an API client
+    # --- Step 2: Extract Information ---
     extract_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction")
-    
-    # Call the extraction API
     extraction_response = extract_client.chat.completions.create(
         model="information-extract",
         messages=[{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
         ]}],
-        response_format=schema
+        response_format=schema  # Use the auto-generated schema
     )
-    
-    # Parse the JSON result
+
+    # --- Step 3: Print or process the result ---
     extracted_data = json.loads(extraction_response.choices[0].message.content)
     return extracted_data
 
@@ -279,10 +284,6 @@ def return_json_for_test(): # 테스트용 함수
 
     return test_data
 
-def return_json(API_KEY, file_path):
-    # Instead of returning test data, use the real extraction function:
-    return extract_information_from_image(API_KEY, file_path)
-
 
 def return_summary_for_test(): #테스트용 함수
 
@@ -302,40 +303,82 @@ def return_summary_for_test(): #테스트용 함수
 """
     return temp
 
-def return_summary(API_KEY, file_path):
-    # Step 1: Extract health information from the image
-    health_info = return_json(API_KEY, file_path)
-    
-    # Step 2: Define the conversation for Solar LLM using the provided prompt for an easy summary
+def return_simpe_summary(API_KEY, file_path, health_info):
+    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
     messages = [
         {
             "role": "system",
             "content": (
-                "You are Dr. 소라, a warm and friendly AI health coach.\n"
-                "Your job is to gently explain a patient's health check-up results using soft and clear language.\n"
-                "Focus only on what needs attention. Never use complex medical terms or diagnosis names.\n"
-                "Explain in everyday language that is emotionally supportive and easy to understand."
+                """You are MAGIC, a Korean, warm and friendly AI health coach.
+                Your job is to gently explain a patient's health check-up results using friendly language.
+                Focus only on what needs attention. Never use complex medical terms or diagnosis names.
+                Explain in everyday language that is emotionally supportive and easy to understand.
+                Use emojis to make the explanation more friendly and engaging.
+
+                Input:
+
+                Doctor's health check-up summary (written in Korean)
+                Patient nickname (e.g., 슬기로운고양이)
+                Age group (e.g., 30대), Gender (e.g., 여성)
+                Output Format:
+                {
+                    👋 Greeting & Empathy (1 short paragraph)
+                    Greet the patient using their nickname. Briefly mention you’ve read their results and will explain gently.
+
+                    📌 Health Summary (2–3 sentences max)
+                    Summarize the main areas that need attention. Keep it short and focused.
+
+                    🔍 Detailed Explanation (up to 3 areas)
+                    For each issue:
+
+                    What was found (in natural words)
+                    Why it matters (soft explanation)
+                    How to help the body (adjust food, exercise, or habits)
+                    Use lifestyle examples that are appropriate to age/gender.
+                    ✅ Lifestyle Tips (2–3 total)
+                    MUST Consider patient's age and sex
+                    Offer kind and simple suggestions on food, movement, or daily routines.
+
+                    Examples should suit the patient’s profile (age and sex):
+                    Young woman → 떡볶이, 마라탕, 홈트
+                    Older woman → 반찬, 산책, 요가
+                    Young man → 치킨, 라면, 헬스
+                    Older man → 등산, 유산소 운동
+                    💬 Friendly Encouragement
+                    End with comforting words to support the patient and encourage action.
+                }
+                """
             )
         },
         {
             "role": "user",
             "content": (
-                f"Here is the health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                #f"Patient's nickname: {health_info['별명']}\n   "
+                #f"Patient's age group: {health_info['나이']}\n"
+                #f"Patient's gender: {health_info['성별']}\n"
+                f"Health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                #f"Brief summary of the health check-up result: {summary_professional}\n"
+
                 "Please provide an easy-to-understand summary focusing on key aspects that need attention."
             )
         }
     ]
     
-    # Step 3: Call the Solar LLM using the Upstage API client
-    client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
-    response = client.chat.completions.create(
-        model="solar-pro",
-        messages=messages
-    )
-    
-    # Extract the summary text from the response
-    summary_text = response.choices[0].message['content']
-    return summary_text
+    try:
+        # Step 2: Call the Solar LLM using the Upstage API client
+        client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
+        response = client.chat.completions.create(
+            model="solar-pro",
+            messages=messages
+        )
+        
+        # Step 3: Extract the summary text from the response
+        summary_text = response.choices[0].message.content
+        return summary_text
+    except Exception as e:
+        # Return a fallback message if the API call fails
+        print(f"Error in return_summary: {str(e)}")
+        return "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
 
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
