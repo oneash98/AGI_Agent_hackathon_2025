@@ -2,16 +2,22 @@ from openai import OpenAI
 import numpy as np
 from typing import List, Dict
 import json
+import faiss
+import pandas as pd
 
 class HealthRAGSystem:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, faiss_index_path: str, metadata_csv: str):
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://api.upstage.ai/v1"
-        )
-        self.health_status = None
-        self.guidelines_db = []  # This would be your vector database of medical guidelines
+        )        
         
+        self.health_status = None
+        # Load the FAISS index
+        self.index = faiss.read_index(faiss_index_path)
+        # Load guideline metadata with chunk texts and other details
+        self.guidelines_df = pd.read_csv(metadata_csv)
+
     def load_health_status(self, health_status: Dict):
         """Load the patient's health status"""
         self.health_status = health_status
@@ -31,19 +37,20 @@ class HealthRAGSystem:
         return np.array(response.data[0].embedding)
 
     def retrieve_relevant_snippets(self, query: str, top_k: int = 3) -> List[str]:
-        """Retrieve relevant guideline snippets using vector similarity"""
+        # Compute the query embedding
         query_embedding = self.get_embeddings(query)
+        # FAISS expects a 2D array of type float32
+        query_embedding = np.array([query_embedding]).astype("float32")
+        # Query the FAISS index for top k results
+        distances, indices = self.index.search(query_embedding, top_k)
         
-        # Calculate similarities with all guidelines
-        similarities = []
-        for guideline in self.guidelines_db:
-            guideline_embedding = self.get_embeddings(guideline)
-            similarity = np.dot(query_embedding, guideline_embedding)
-            similarities.append((similarity, guideline))
+        relevant_snippets = []
+        for idx in indices[0]:
+            snippet = self.guidelines_df.iloc[idx]['chunk_text']
+            relevant_snippets.append(snippet)
         
-        # Sort by similarity and get top k
-        similarities.sort(reverse=True)
-        return [snippet for _, snippet in similarities[:top_k]]
+        return relevant_snippets
+
 
     def construct_prompt(self, query: str, relevant_snippets: List[str]) -> str:
         """Construct the prompt for the LLM"""
@@ -94,7 +101,11 @@ def main(api_key: str, health_status: Dict, user_query: str):
         Response from the RAG system
     """
     # Initialize the RAG system
-    rag_system = HealthRAGSystem(api_key=api_key)
+    rag_system = HealthRAGSystem(
+        api_key=api_key,
+        faiss_index_path="every_faiss_index.bin",
+        metadata_csv="RAG_every.csv"
+    )
     
     # Load health status
     rag_system.load_health_status(health_status)
