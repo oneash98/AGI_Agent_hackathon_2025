@@ -1,68 +1,89 @@
-# 건강검진 결과 해석 및 병원 추천 시스템
+# 🛠️ [AI 건강검진결과 분석 도우미 - MAGIC]
 
-## 프로젝트 개요
-이 프로젝트는 사용자가 업로드한 건강검진 결과 이미지를 OCR 및 구조 인식 기술을 통해 분석하여, JSON 형태의 건강 정보를 추출합니다. 이를 바탕으로 친근한 건강 팁, 임상적으로 정확한 전문 요약, LLM을 활용한 쉬운 설명을 제공하며, 사용자의 위치 정보를 활용하여 적합한 병원이나 약국을 추천하는 통합 솔루션입니다. 추가로, 사용자의 검진 결과와 전문적인 건강 정보에 기반하여 챗봇 형식의 맞춤형 Q&A를 제공합니다.
+### 📌 Overview
+This project was developed as part of the AGI Agent Application Hackathon. It aims to provide friendly explanations and health tips about the user's health checkup results.
 
-## Quickstart
-0. **서비스 링크**  
-   agent-hackathon.streamlit.app  
-   (25.04.05. 이후 삭제 예정)
+### 🚀 Key Features
+- ✅ **Information Extraction**: Extract key information from uploaded images using OCR and information extraction technology of Upstage and convert it into JSON format.
 
+  - Key Items:
 
-1. **레포지토리 클론**
-   ```bash
-   git clone <https://github.com/oneash98/AGI_Agent_hackathon_2025>
-   ```
+    - Physical measurements: Height, weight, BMI, waist circumference
+    - Blood tests: Blood pressure, hemoglobin, fasting blood sugar, cholesterol, triglycerides, etc.
+    - Other test results: Liver function, kidney function, chest X-ray findings, etc.
 
-2. **환경 변수 설정**  
-   프로젝트 루트 디렉토리에 `.env` 파일을 생성하거나, 스트림릿 실행 환경에서 `st.secrets`를 사용하여 아래 API 키들을 설정합니다.
-   - `API_KEY`: Upstage API Key (OCR, 정보 추출, LLM 호출용)
-   - `GOOGLE_MAPS_API_KEY`: 구글 맵 API Key (지도 연동 및 병원 위치 표시용)
+- ✅ **Providing Health Tips During Loading**: As the process of extracting key information form images takes time, it offers useful health knowledge to the use while waiting for the result.
 
-3. **필수 라이브러리 설치**  
-   제공된 `requirements.txt` 파일을 사용하여 필요한 패키지를 한 번에 설치합니다. (Python 3.12)
-   ```bash
-   pip install -r requirements.txt
-   ```
+- ✅ **Friendly Explanation**: Generate user-friendly summary phrases based on the extracted health checkup results using Upstage SOLAR. Avoid complex medical jargon and use everydaty language to provide explanations that also emotionally support the patient.
 
-4. **프로젝트 실행**  
-   Streamlit 기반 UI를 실행합니다.
-   ```bash
-   streamlit run UI.py
-   ```
+- ✅ **Hospital/Clinic Recommendations**: Recommend appropriate medical department/specialty based on the user's health checkup results, and also search for hostpitals/clinics nearby the user.
 
-## 기능 설명
-### 1. 사용자 초기 입력
-- **입력 항목**: 나이대(10대~90대), 성별
-- **역할**: 추후 개인 맞춤형 건강 정보 및 병원 추천에 활용되는 기본 사용자 정보를 입력받습니다.
+- ✅ **Additional Query System**: When the user asks additional health-related questions (e.g., “How can I manage my hypertension?”), the system provides personalized answers in a chatbot format by referencing the user’s health checkup results and professional health information databases with RAG architecture.
 
-### 2. 건강검진 결과 업로드
-- **기능**: 사용자가 스마트폰이나 기타 디바이스로 촬영한 건강검진 결과 이미지를 업로드합니다.
+### 🖼️ Demo / Screenshots
+https://agi-agent-hackathon.streamlit.app/  
+(Available until Apr 5, 2025)
 
-### 3. Information Extraction (OCR + 구조 인식)
-- **목적**: 업로드된 이미지에서 OCR 기술을 통해 텍스트를 추출하고, 구조 인식을 통해 건강검진 결과를 JSON 포맷으로 변환합니다.
-- **주요 추출 항목**:  
-  - 신체 계측: 키, 몸무게, 체질량지수, 허리둘레
-  - 혈액 검사: 혈압, 혈색소, 공복혈당, 콜레스테롤, 중성지방 등
-  - 기타 검사 결과: 간 기능, 신장 기능, 흉부촬영 결과 등
-- **API 사용**: Upstage API를 활용하여 이미지 인코딩 및 정보 추출을 수행합니다.
+![screenshot](./sample_data/Screenshot.png)  
 
-### 4. 로딩 중 친근한 정보 제공
-- **설명**: 이미지 → JSON 변환 과정에 시간이 소요될 경우, 미리 준비된 `friendlyInformation.csv` 파일에 건강 상식 중 무작위로 하나를 선택하여 사용자에게 유용한 건강 팁을 제공합니다.
+### 🧩 Tech Stack
+- **Upstage API**
+- **LangChain**
+- **Streamlit**
 
-### 5. LLM을 이용한 친근한 설명 제공
-- **기능**: 추출한 건강검진 결과 정보를 기반으로 사용자가 이해하기 쉬운 친근한 건강 요약 문구를 생성합니다.
-- **특징**: 어려운 의학 용어 대신 일상 언어를 사용하여, 환자에게 감정적으로도 지원하는 설명을 제공합니다.
+### 🏗️ Project Structure
+```
+📁 AGI_AGENT_HACKATHON_2025-MAGIC/
+├── data/
+├── sample_data/
+├── main.py
+├── rag_based_query_system.py
+├── UI.py
+├── README.md
+├── requirements.txt
+```
 
-### 6. 진료과 추천
-- **목적**: 사용자의 건강검진 결과를 기반으로 적절한 진료과를 추천합니다.
+### 🔧 Setup & Installation
 
-### 7. 병원 추천
-- **목적**: 사용자의 건강검진 결과와 위치 정보를 기반으로 가장 적합한 병원을 추천합니다.
-- **프로세스**:
-  - **추천 병원 표시**: 사용자에게 필요한 진료를 받을 수 있는 병원들 중 가장 가까운 병원 정보(병원 이름, 주소, 전화번호, 홈페이지 링크 등)를 알려줍니다.
-  - **지도 연동**: 병원 이름을 클릭 시 지도 상의 위치를 제공합니다.
+```bash
+# Clone the repository
+git clone https://github.com/UpstageAI/cookbook/usecase/agi-agent-application/AGI_AGENT_HACKATHON_2025-MAGIC.git
+cd <repository_directory> # your directory
 
+# Install packages
+pip install -r requirements.txt # Python == 3.12
 
-### 8. Chatbot UI - 추가 질의시스템 
-- **역할**: 사용자가 추가적인 건강 관련 질문(예: “고혈압은 어떻게 관리하나요?”)을 입력하면, 사용자의 건강검진 결과와 전문적인 건강 정보 DB를 참고하여 사용자 맞춤형 답변을 제공합니다.
+# create .env
+echo "API_KEY = '<your Upstage API KEY>'" > .env
+echo "GOOGLE_MAPS_API_KEY = '<your Google Maps API KEY>'" >> .env
+
+# run streamlit
+streamlit run UI.py
+```
+
+### 📁 Dataset & References
+- [전국 병의원 및 약국 현황](http://opendata.hira.or.kr/op/opc/selectOpenData.do?sno=11925)
+- [일반인을 위한 만성콩팥병 바로알기(3종)](https://www.kdca.go.kr/board/board.es?mid=a20503050000&bid=0021&tag=&act=view&list_no=143371)
+- [간질환 바로 알기](https://www.kasl.org/bbs/?number=6028&mode=view&code=general_pamphlet&keyfield=&keyword=&category=&gubun=&orderfield=)
+- [한국인 간질환 백서 (개정판): 2023년 업데이트](https://www.kasl.org/bbs/?number=5499&mode=view&code=ency&keyfield=&keyword=&category=&gubun=&orderfield=)
+- [나와 가족을 위한 고혈압 예방과 관리 정보](https://www.guideline.or.kr/chronic/view.php?number=88)
+- [나와 가족을 위한 당뇨병 예방과 관리 정보](https://www.guideline.or.kr/chronic/view.php?number=89)
+- [나와 가족을 위한 이상지질혈증 예방과 관리 정보](https://www.guideline.or.kr/chronic/view.php?number=90)
+
+### 🙌 Team Members
+
+| Name        | Role               | GitHub                             |
+|-------------|--------------------|------------------------------------|
+| Ji Woo Song     | PM, LLM Pipeline | [@jiuisdisciple](https://github.com/jiuisdisciple) |
+| Hanjae Kim  | User Interface, Backend, Code Integration  | [@ONEASH](https://github.com/oneash98) |
+| Yeonjae Han  | LLM Pipeline, Prompt Engineering  | [@yeonjaehan](https://github.com/yeonjaehan) |
+| Seunghyun Park  | Data Preparation, Prompt Engineering  | [@bluutaco](https://github.com/bluutaco) |
+
+### ⏰ Development Period
+- Last updated: 2025-04-04
+
+### 📄 License
+This project is licensed under the [MIT license](https://opensource.org/licenses/MIT).  
+See the LICENSE file for more details.
+
+### 💬 Additional Notes

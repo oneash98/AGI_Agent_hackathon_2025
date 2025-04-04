@@ -69,7 +69,7 @@ if 'rag_system' not in st.session_state:
 
 
 df_loading_text = pd.read_csv('data/loading_text.csv', index_col = 'index', encoding='utf-8-sig') # 로딩 시 보여줄 건강 안내 문구
-df_clinics = pd.read_pickle('data/clinics_info2.pkl') # 병원 정보 데이터
+df_clinics = pd.read_pickle('data/clinics_info.pkl') # 병원 정보 데이터
 
 
 ########## functions ###########
