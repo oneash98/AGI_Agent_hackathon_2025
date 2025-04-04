@@ -13,10 +13,17 @@ def encode_image_to_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def extract_information_from_image(API_KEY, file_path):
+def return_json(API_KEY, file_path, result_queue):
+    schema_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction/schema-generation")
     # Encode the image
     encoded_image = encode_image_to_base64(file_path)
     
+    schema_response = schema_client.chat.completions.create(
+        model="information-extract",
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
+        ]}],
+    )
     # Define your schema (or use a pre-generated one)
     schema = {
         "type": "json_schema",
@@ -157,20 +164,19 @@ def extract_information_from_image(API_KEY, file_path):
         }
     }
     
-    # Create an API client
+    # --- Step 2: Extract Information ---
     extract_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction")
-    
-    # Call the extraction API
     extraction_response = extract_client.chat.completions.create(
         model="information-extract",
         messages=[{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
         ]}],
-        response_format=schema
+        response_format=schema  # Use the auto-generated schema
     )
-    
-    # Parse the JSON result
+
+    # --- Step 3: Print or process the result ---
     extracted_data = json.loads(extraction_response.choices[0].message.content)
+    result_queue.put(("health_info", extracted_data))
     return extracted_data
 
 # upstage request 오류 확인
@@ -201,151 +207,144 @@ def test_function(API_KEY, file_path):
 
 
 
-# 개발용 예시 데이터
-test_data = """
-{
-"나이": 30대,
-"별명": 건강한다람쥐,
-"성별": 여성,
-"키": 158,
-"몸무게": 65.4,
-"체질량지수": 26.2,
-"허리둘레": 86.0,
-"혈압": "135/88 mmHg",
-"혈색소": "12.6",
-"빈혈 소견": "정상",
-"공복혈당": "108",
-"당뇨병 소견": "공복혈당장애 의심",
-"총콜레스테롤": "198",
-"고밀도콜레스테롤": "55",
-"중성지방": "140",
-"저밀도콜레스테롤": "115",
-"이상지질혈증 소견": "정상",
-"혈청크레아티닌": "1.5",
-"eGFR": "48",
-"신장질환 소견": "만성 신장병 의심",
-"AST": "55",
-"ALT": "62",
-"감마지티피": "85",
-"간장질환": "지속적 간기능 이상",
-"요단백": "양성(1+)",
-"흉부촬영": "정상"
-}
-"""
-test_data2 = """
-- **환자 기본 정보**: 1966년생 여성, 2025년 6월 12일 기준 만 58세
-
-- **의무기록 전문**:
-
-환자는 2025년 6월 12일 시행한 건강검진 상 신장기능 저하 및 간기능 이상 소견을 보임.  
-
-1. **체격 및 신체 계측**
-   - 키 158 cm, 몸무게 65.4 kg, 체질량지수(BMI) 26.2 kg/m²로 과체중 범주(25.0–29.9)에 해당.
-   - 허리둘레 86.0 cm로 복부비만 기준(여성 85 cm 이상)에 미달.
-
-2. **대사계 검사**
-   - 공복혈당 108 mg/dL로 공복혈당장애(IFG: 100–125 mg/dL) 범주이며, 당뇨병 전단계에 해당함.
-   - 지질 프로파일:
-     - 총콜레스테롤 198 mg/dL로 정상범위(<200 mg/dL) 내.
-     - LDL 콜레스테롤 115 mg/dL (정상범위: <130 mg/dL)
-     - HDL 콜레스테롤 55 mg/dL (여성 ≥50 mg/dL)
-     - 중성지방 140 mg/dL (정상범위: <150 mg/dL)
-   - 이상지질혈증 관련 소견 없음.
-
-3. **혈액학 검사**
-   - 혈색소(Hb) 12.6 g/dL로 여성 정상범위(12.0–16.0 g/dL)에 해당하며 빈혈 소견 없음.
-
-4. **순환기계 검사**
-   - 혈압 135/88 mmHg로 정상범위(수축기혈압 <130 mmHg, 이완기혈압 <85 mmHg)에 근접하였으며, 고혈압 전단계 주의 요망.
-
-5. **신장기능 검사**
-   - 혈청 크레아티닌(Cr) 1.5 mg/dL로 정상범위(0.7–1.2 mg/dL)를 상회.
-   - eGFR 48 mL/min/1.73㎡로 만성 신장병 기준(<60 mL/min/1.73㎡)에 해당하며, 만성 신장병 의심.
-   - 요단백 검사 결과 양성(1+)으로 단백뇨 소견 있음.
-
-6. **간기능 검사**
-   - AST 55 IU/L, ALT 62 IU/L, γ-GTP 85 IU/L로 모두 정상범위(AST/ALT ≤40 IU/L, γ-GTP ≤50 IU/L)를 상회.
-   - 간장질환 관련 소견: 지속적 간기능 이상 의심.
-
-7. **영상검사**
-   - 흉부 X-ray 검사상 폐야 청정하며 심장, 흉곽 구조물 등 특이소견 없음.
-
----
-
-환자는 신장기능 저하 및 간기능 이상 소견을 보임. 정기적인 추적 관찰 및 생활습관 개선, 식이요법, 운동 등 적극적인 관리가 요망됨.
-"""
-
-def return_json_for_test(): # 테스트용 함수
-
-    return test_data
-
-def return_json(API_KEY, file_path):
-    # Instead of returning test data, use the real extraction function:
-    return extract_information_from_image(API_KEY, file_path)
-
-
-def return_summary_for_test():
-
-    temp = "요약"
-
-    return temp
-
-def return_explanation_for_test(): #테스트용 함수
-
-    temp = """
-👋 안녕하세요, 건강한다람쥐님! 검사 결과를 살펴봤어요. 걱정하지 마세요. 함께 차근차근 살펴보도록 해요.
-
-📌 주요 사항: 혈당, 신장 기능, 간 기능
-
-🔍 자세한 설명:
-
-* 혈당: 공복 혈당이 높은 편이에요. 이는 혈당을 조절하는 데 주의가 필요함을 의미해요. 과일, 채소와 같은 건강한 탄수화물을 선택하고, 규칙적인 운동을 통해 혈당을 관리할 수 있어요.
-(생략)
-
-✅ 생활습관 팁:
-(생략)
-
-"""
-    return temp
-
-def return_summary(API_KEY, file_path):
-    # Step 1: Extract health information from the image
-    health_info = return_json(API_KEY, file_path)
-    
-    # Step 2: Define the conversation for Solar LLM using the provided prompt for an easy summary
+def return_simple_explanation(API_KEY, health_info, summary, result_queue):
+    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
     messages = [
         {
             "role": "system",
             "content": (
-                "You are Dr. 소라, a warm and friendly AI health coach.\n"
-                "Your job is to gently explain a patient's health check-up results using soft and clear language.\n"
-                "Focus only on what needs attention. Never use complex medical terms or diagnosis names.\n"
-                "Explain in everyday language that is emotionally supportive and easy to understand."
+                """You are MAGIC, a Korean, warm and friendly AI health coach.
+                Your job is to gently explain a patient's health check-up results using friendly language.
+                Focus only on what needs attention. Never use complex medical terms or diagnosis names.
+                Explain in everyday language that is emotionally supportive and easy to understand.
+                Use emojis to make the explanation more friendly and engaging.
+
+                Input:
+
+                Doctor's health check-up summary (written in Korean)
+                Age group (e.g., 30대), Gender (e.g., 여성)
+                Output Format:
+                    👋 Greeting & Empathy (1 short paragraph)
+                    Greet the patient. Briefly mention you’ve read their results and will explain gently.
+
+                    📌 Health Summary (2–3 sentences max)
+                    Summarize the main areas that need attention. Keep it short and focused.
+
+                    🔍 Detailed Explanation (up to 3 areas)
+                    For each issue:
+
+                    What was found (in natural words)
+                    Why it matters (soft explanation)
+                    How to help the body (adjust food, exercise, or habits)
+                    Use lifestyle examples that are appropriate to age/gender.
+                    ✅ Lifestyle Tips (2–3 total)
+                    MUST Consider patient's age and sex
+                    Offer kind and simple suggestions on food, movement, or daily routines.
+
+                    Examples should suit the patient’s profile (age and sex):
+                    Young woman → 떡볶이, 마라탕, 홈트
+                    Older woman → 반찬, 산책, 요가
+                    Young man → 치킨, 라면, 헬스
+                    Older man → 등산, 유산소 운동
+                    💬 Friendly Encouragement
+                    End with comforting words to support the patient and encourage action.
+                """
             )
         },
         {
             "role": "user",
             "content": (
-                f"Here is the health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                #f"Patient's nickname: {health_info['별명']}\n   "
+                #f"Patient's age group: {health_info['나이']}\n"
+                #f"Patient's gender: {health_info['성별']}\n"
+                f"Health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                f"Brief summary of the health check-up result: {summary}\n"
+
                 "Please provide an easy-to-understand summary focusing on key aspects that need attention."
             )
         }
     ]
     
-    # Step 3: Call the Solar LLM using the Upstage API client
-    client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
-    response = client.chat.completions.create(
-        model="solar-pro",
-        messages=messages
-    )
+    try:
+        # Step 2: Call the Solar LLM using the Upstage API client
+        client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
+        response = client.chat.completions.create(
+            model="solar-pro",
+            messages=messages
+        )
+        
+        # Step 3: Extract the summary text from the response
+        summary_text = response.choices[0].message.content
+        result_queue.put(("simple_explanation", summary_text))
+        return summary_text
     
-    # Extract the summary text from the response
-    summary_text = response.choices[0].message['content']
-    return summary_text
+    except Exception as e:
+        # Return a fallback message if the API call fails
+        print(f"Error in return_summary: {str(e)}")
+        error_message = "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
+        result_queue.put(("explanation_error", error_message))
+        return error_message
 
+
+def return_summary(API_KEY, health_info):
+    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                """You are MAGIC, a Korean, warm and friendly AI health coach.
+                Your job is to gently explain a patient's health check-up results using friendly language.
+                Focus only on what needs attention. Never use complex medical terms or diagnosis names.
+                Explain in everyday language that is emotionally supportive and easy to understand.
+                Use emojis to make the explanation more friendly and engaging.
+
+                각 항목은 아래의 간략한 기준에 따라 평가해주세요 (반대쪽의 저하 수치도 동일한 단계로 적용):  
+                - **체질량지수 (BMI):** 정상 18.5–24.9, Mild High 25.0–29.9, Severe High ≥30.0 
+                - **허리둘레:** 남성 – 정상 80–89, 비정상 ≥ 90; 여성 – 정상 70–84, 비정상 ≥85  
+                - **혈압 (Systolic/Diastolic):** 정상 100–119/70–79, 주의 혈압 120–129/70–79, 고혈압 전단계 130–139/80–89, 고혈압 ≥140/≥90  
+                - **혈색소:** 남성 – 정상 13.5–16.0, 여성 – 정상 12.0–15.0; 낮거나 높으면 각각 Mild/Severe Low 또는 High로 판단  
+                - **공복혈당:** 정상 99 이하, 공복혈당장애 100–125, 당뇨병 ≥126  
+                - **총콜레스테롤:** 정상 160–199, 주의 200–239, 이상지질혈증 ≥240  
+                - **고밀도콜레스테롤 (HDL):**  정상 40-60, 낮거나 높으면 단계에 따라 평가, 높을수록 좋음
+                - **중성지방:** 정상 150미만, 150~199㎎/㎗이면 주의, 200㎎/㎗ 이상이면 치료가 필요한 상태
+                - **저밀도콜레스테롤 (LDL):** 정상 < 150, 비정상 >= 150
+                - **혈청크레아티닌:** 정상 0.50~1.4 mg/dL  
+                - **eGFR:** 정상 분당 90ml이상, 2 단계 분당 60-90ml이하, 3 단계 분당 30-59ml이하, 4 단계 분당 15ml-29ml이하, 5 단계 < 분당 15ml
+
+                이 요약은 환자와 대화할 떄 계속 기억할 '단기 기억'으로 사용될 것입니다.
+                """
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                #f"Patient's nickname: {health_info.get('별명', '환자')}\n"
+                # f"Patient's age: {st.session_state.age}\n"
+                # f"Patient's gender: {st.session_state.gender}\n"
+                f"Health check-up result: {json.dumps(health_info, ensure_ascii=False)}\n"
+                "위 데이터를 바탕으로, 각 항목별 위험도를 평가하고 환자가 가장 주의해야 할 건강 문제를 간결하게 요약해주세요."
+            )
+        }
+    ]
+    
+    try:
+        # Step 2: Call the Solar LLM using the Upstage API client
+        client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
+        response = client.chat.completions.create(
+            model="solar-pro",
+            messages=messages
+        )
+        
+        # Step 3: Extract the summary text from the response
+        summary_text = response.choices[0].message.content
+        return summary_text
+    except Exception as e:
+        # Return a fallback message if the API call fails
+        print(f"Error in return_summary: {str(e)}")
+        return "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
-def suggest_specialty(API_KEY, health_info, summary):
+def suggest_specialty(API_KEY, health_info, summary, result_queue):
     llm = ChatUpstage(api_key=API_KEY, model="solar-pro")
     
     prompt_template = """
@@ -401,6 +400,8 @@ def suggest_specialty(API_KEY, health_info, summary):
     reason = temp['추천_사유']
     specialty = temp['추천_진료과']
     
+    result_queue.put(("reason", reason))
+    result_queue.put(("specialty", specialty))
     return reason, specialty
 
 
