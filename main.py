@@ -8,6 +8,8 @@ import base64, json
 from openai import OpenAI
 from scipy.spatial import KDTree
 import numpy as np
+import faiss
+import pandas as pd
 
 def encode_image_to_base64(path):
     with open(path, "rb") as f:
@@ -391,11 +393,14 @@ def return_summary(API_KEY, file_path, health_info):
         {
             "role": "system",
             "content": (
-                """You are MAGIC, a Korean, warm and friendly AI health coach.
-                Your job is to gently explain a patient's health check-up results using friendly language.
-                Focus only on what needs attention. Never use complex medical terms or diagnosis names.
-                Explain in everyday language that is emotionally supportive and easy to understand.
-                Use emojis to make the explanation more friendly and engaging.
+                """
+                당신은 내과 의사입니다. 
+                아래 환자의 건강검진 결과를 평가할 때, 모든 항목을 다음 5단계로 판단하세요:  
+                - **Severe Low:** 수치가 심각하게 낮음  
+                - **Mild Low:** 약간 낮음  
+                - **Normal:** 정상 범위  
+                - **Mild High:** 약간 높음  
+                - **Severe High:** 수치가 심각하게 높음  
 
                 각 항목은 아래의 간략한 기준에 따라 평가해주세요 (반대쪽의 저하 수치도 동일한 단계로 적용):  
                 - **체질량지수 (BMI):** 정상 18.5–24.9, Mild High 25.0–29.9, Severe High ≥30.0  
