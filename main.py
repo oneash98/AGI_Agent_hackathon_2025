@@ -11,13 +11,15 @@ import numpy as np
 import faiss
 import pandas as pd
 
+# 이미지 인코딩용 함수
 def encode_image_to_base64(path):
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def return_json(API_KEY, file_path, result_queue):
-    schema_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction/schema-generation")
-    # Encode the image
+# 검진결과 (JSON) 추출 함수
+def return_json(API_KEY, file_path):
+    schema_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction/schema-generation") # 업스테이지 information extraction 
+    # 이미지 인코딩
     encoded_image = encode_image_to_base64(file_path)
     
     schema_response = schema_client.chat.completions.create(
@@ -26,7 +28,7 @@ def return_json(API_KEY, file_path, result_queue):
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
         ]}],
     )
-    # Define your schema (or use a pre-generated one)
+    # 사용자 정의 스키마 -> 건강검진 결과에서 추출할 항목 지정
     schema = {
         "type": "json_schema",
         "json_schema": {
@@ -166,30 +168,27 @@ def return_json(API_KEY, file_path, result_queue):
         }
     }
     
-    # --- Step 2: Extract Information ---
+    # --- Step 2: 정보 추출 ---
     extract_client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1/information-extraction")
     extraction_response = extract_client.chat.completions.create(
         model="information-extract",
         messages=[{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded_image}"}}
         ]}],
-        response_format=schema  # Use the auto-generated schema
+        response_format=schema  # 위에서 정의한 스키마 사용
     )
 
-    # --- Step 3: Print or process the result ---
-    extracted_data = json.loads(extraction_response.choices[0].message.content)
-    result_queue.put(("health_info", extracted_data))
+    extracted_data = json.loads(extraction_response.choices[0].message.content) # 결과 반환
     return extracted_data
 
-# upstage request 오류 확인
+# upstage request 오류 확인용 함수
 def print_upstage_error(response):
     if 'error' in response.json().keys():
         return response.json()['error']
 
 
-
-def return_simple_explanation(API_KEY, health_info, summary, result_queue):
-    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
+# 친절한 설명 생성용 함수
+def return_simple_explanation(API_KEY, health_info, summary):
     messages = [
         {
             "role": "system",
@@ -247,28 +246,26 @@ def return_simple_explanation(API_KEY, health_info, summary, result_queue):
     ]
     
     try:
-        # Step 2: Call the Solar LLM using the Upstage API client
+        # Solar LLM 호출
         client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
         response = client.chat.completions.create(
             model="solar-pro",
             messages=messages
         )
         
-        # Step 3: Extract the summary text from the response
+        # 결과 추출
         summary_text = response.choices[0].message.content
-        result_queue.put(("simple_explanation", summary_text))
-        return summary_text
+        return {"result": True, "text": summary_text}
     
     except Exception as e:
         # Return a fallback message if the API call fails
         print(f"Error in return_summary: {str(e)}")
         error_message = "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
-        result_queue.put(("explanation_error", error_message))
-        return error_message
+        return {"result": False, "text": error_message}
 
-
+# 핵심 요약 생성용 함수
 def return_summary(API_KEY, health_info):
-    # Step 1 Define the conversation for Solar LLM using the provided prompt for an easy summary
+
     messages = [
         {
             "role": "system",
@@ -312,14 +309,14 @@ def return_summary(API_KEY, health_info):
     ]
     
     try:
-        # Step 2: Call the Solar LLM using the Upstage API client
+        # Solar LLM 호출
         client = OpenAI(api_key=API_KEY, base_url="https://api.upstage.ai/v1")
         response = client.chat.completions.create(
             model="solar-pro",
             messages=messages
         )
         
-        # Step 3: Extract the summary text from the response
+        # 결과 추출
         summary_text = response.choices[0].message.content
         return summary_text
     except Exception as e:
@@ -328,9 +325,8 @@ def return_summary(API_KEY, health_info):
         return "죄송합니다. 요약 정보를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요."
 
 # 진료과 추천 함수 (추천 사유와 추천 진료과 반환)
-def suggest_specialty(API_KEY, health_info, summary, result_queue):
+def suggest_specialty(API_KEY, health_info, summary):
     llm = ChatUpstage(api_key=API_KEY, model="solar-pro")
-    
     prompt_template = """
     당신은 의료 인공지능 챗봇 MAGIC입니다. 
     환자의 <건강검진 결과>와 <요약 정보>를 분석해, 다음 진료과 중 가장 적절한 곳을 1곳 추천하거나, 추천하지 않음:
@@ -360,6 +356,7 @@ def suggest_specialty(API_KEY, health_info, summary, result_queue):
     동일 환자에게 복합적으로 여러 질환이 발견되어도, 혹은 판단이 애매한 경우라도 위 기준을 토대로 가장 적합한 과를 반드시 하나만 추천할 것
     검진 결과가 모두 정상이라면 "추천_진료과"를 "해당없음"으로 출력할 것 
     예시 출력과 같이 JSON 형식으로 출력할 것
+    JSON 형식의 최종 답변 외에 다른 문장은 추가하지 말 것
     
     예시: 체중 증가, 혈색소 수치 정상, 공복 혈당 약간 높음 (경계 수준)
     예시 출력:
@@ -374,18 +371,21 @@ def suggest_specialty(API_KEY, health_info, summary, result_queue):
     <요약 정보>:
     {summary}
     """
-    final_prompt = PromptTemplate.from_template(prompt_template)
-    output_parser = StrOutputParser()
+    final_prompt = PromptTemplate.from_template(prompt_template).format(health_info = health_info, summary = summary)
+    
+    response = llm.invoke(final_prompt)
+    response = StrOutputParser().invoke(response)
 
-    chain = final_prompt | llm | output_parser
-    response = chain.invoke({"health_info": health_info, "summary": summary})
-
-    temp = json.loads(response)
+    try: # llm이 json을 str으로 출력 시:
+        temp = json.loads(response)
+    except: # llm이 코드블록으로 json 출력 시:
+        start = response.find('{')     
+        end   = response.rfind('}')        
+        temp = response[start:end+1]  
+        temp = json.loads(temp)
     reason = temp['추천_사유']
     specialty = temp['추천_진료과']
-    
-    result_queue.put(("reason", reason))
-    result_queue.put(("specialty", specialty))
+     
     return reason, specialty
 
 

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from PIL import Image
 import pandas as pd
 import threading, queue, time, random
-from rag_based_query_system import HealthRAGSystem
+from rag_based_query_system import main as rag_main
 
 
 
@@ -20,38 +20,40 @@ if 'API_KEY' not in st.session_state: # API key 담을 변수 설정
 	if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 API KEY 가져오기 
 		load_dotenv()
 		st.session_state.API_KEY = os.getenv("API_KEY")
-	else: # 스트림릿 웹에서 실행 시
+	else: # 로컬에서 테스트 실행 시 API KEY 가져오기 
 		st.session_state.API_KEY = st.secrets["API_KEY"]
 
+# 유저 화면에 보여줄 마스킹된 API KEY 변수
 if 'masked_API_KEY' not in st.session_state:
 	st.session_state.masked_API_KEY = ""
 
-# 사용자 정보
+# 구글맵 api
+if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 API KEY 가져오기 
+	load_dotenv()
+	GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+else: # 로컬에서 테스트 실행 시 API KEY 가져오기 
+	GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
+
+# --------------------- 사용자 기본 정보 ---------------------------------------
 if 'gender' not in st.session_state:
 	st.session_state.gender = None
-
 if 'age' not in st.session_state:
 	st.session_state.age = None
 
-# 구글맵 api
-if os.path.exists('.env'): 	# 로컬에서 테스트 실행 시 
-	load_dotenv()
-	GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
-else: # 스트림릿 웹에서 실행 시
-	GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
-	
-
-if 'viewer_visible' not in st.session_state: # 파일 뷰어 상태 설정
+# --------------------- UI 상태값 초기화 --------------------------------------	
+if 'viewer_visible' not in st.session_state: # 업로드한 파일 미리보기 on/off
 	st.session_state.viewer_visible = False
 
 if 'last_uploaded_file' not in st.session_state:
 	st.session_state.last_uploaded_file = None
 
-if 'has_result' not in st.session_state: # 결과 상태 설정
+# 분석 결과 관련 상태 설정
+if 'has_result' not in st.session_state: 
     st.session_state.has_result = False
     st.session_state.simple_explanation = ""
 
-if 'health_info' not in st.session_state: # 건강 정보 (JSON) 상태 설정
+# 건강 정보 (JSON) 상태 설정
+if 'health_info' not in st.session_state: 
 	st.session_state.health_info = None
 
 if 'reason_for_specialty' not in st.session_state: # 진료과 추천 이유
@@ -63,47 +65,64 @@ if 'specialty' not in st.session_state: # 추천 진료과 상태
 # 챗봇 상태 초기화
 if 'messages' not in st.session_state:
     st.session_state.messages = []
-
 if 'rag_system' not in st.session_state:
     st.session_state.rag_system = None
 
+
+################## 각종 데이터 로드 ##################
 
 df_loading_text = pd.read_csv('data/loading_text.csv', index_col = 'index', encoding='utf-8-sig') # 로딩 시 보여줄 건강 안내 문구
 df_clinics = pd.read_pickle('data/clinics_info.pkl') # 병원 정보 데이터
 
 
-########## functions ###########
+################## 각종 함수 정의 ##################
 
-# 건강검진 파일 업로드 후 실행 함수
+# 건강검진 파일 업로드 후 실행 버튼 클릭 시 실행될 함수
 def initial_run():
-	if not uploaded_file: # 파일 없을 경우
+	if not uploaded_file: # 업로드된 파일 없이 실행 버튼 클릭할 경우 경고
 		with container_file:
 			st.markdown("파일을 업로드해주세요")
 		return None
 
-	if st.session_state.gender is None or st.session_state.age is None:
+	if st.session_state.gender is None or st.session_state.age is None: # 유저 정보 입력 안했을 경우 경고
 		with container_file:
 			st.markdown("성별과 나이를 입력해주세요")
 		return None
 	
 	file_path = save_file(uploaded_file) # 파일 저장 및 파일 경로 return
 
+	# ---------- 백그라운드 스레드 설정 (LLM 추론 진행되는 동안 로딩 화면 돌아갈 수 있도록)-------------
 	completion_event = threading.Event() # 스레드 완료 이벤트
 	result_queue = queue.Queue() # 결과 저장용 큐 생성
 
-	# 스레드 실행
+	# 스레드 실행 함수 (검진 결과 JSON 추출 -> 핵심 요약 -> 친절한 설명 -> 진료과 추천)
 	def thread_worker(API_KEY, file_path, result_queue):
 		try:
-			health_info = return_json(API_KEY, file_path, result_queue) # 검진 결과 JSON
-			summary = return_summary(API_KEY, health_info) # 핵심 요약
-			simple_explanation = return_simple_explanation(API_KEY, health_info, summary, result_queue) # 친절한 설명
-			reason, specialty = suggest_specialty(API_KEY, health_info, summary, result_queue) # 진료과 추천
+			# 검진 결과 JSON
+			health_info = return_json(API_KEY, file_path) 
+			result_queue.put(("health_info", health_info)) # 저장
+			
+			# 핵심 요약
+			summary = return_summary(API_KEY, health_info) 
+
+			# 친절한 설명
+			simple_explanation = return_simple_explanation(API_KEY, health_info, summary) 
+			if simple_explanation['result']: # 저장
+				result_queue.put(("simple_explanation", simple_explanation['text']))
+			else:
+				result_queue.put(("explanation_error", simple_explanation['text']))
+			
+			# 진료과 추천
+			reason, specialty = suggest_specialty(API_KEY, health_info, summary)
+			result_queue.put(("reason", reason)) # 저장
+			result_queue.put(("specialty", specialty)) # 저장
+
 		except Exception as e:
 			result_queue.put(("error", str(e)))
 		finally:
-			completion_event.set()
+			completion_event.set() # 모든 작업 완료
 
-	# API 호출 스레드 시작
+	# 스레드 시작 (LLM 추론)
 	api_thread = threading.Thread(
 		target=thread_worker,
 		args=(st.session_state.API_KEY, file_path, result_queue)
@@ -111,10 +130,10 @@ def initial_run():
 	api_thread.daemon = True
 	api_thread.start()
 
-	# 로딩 표시 영역
-	loading_container = st.empty()
+	# 로딩 화면 영역
+	loading_container = st.empty() # 로딩 애니메이션용 컨테이너
 	start_time = time.time()
-	index = random.randrange(1, 101)
+	index = random.randrange(1, 101) # 건강 상식 랜덤 인덱스
 	last_change = start_time
 
 	# 스레드(LLM 추론) 끝날 때까지 로딩 화면
@@ -141,7 +160,7 @@ def initial_run():
 		# 짧은 대기 후 상태 확인
 		time.sleep(0.1)
 	
-	# 로딩 표시 제거
+	# 스레드 완료 후 로딩 표시 제거
 	loading_container.empty()
 
 	# 결과 수집 및 처리
@@ -150,6 +169,7 @@ def initial_run():
 		key, value = result_queue.get()
 		results[key] = value
 	
+	# 세션 상태 업데이트 
 	st.session_state.health_info = results['health_info']
 	st.session_state.simple_explanation = results['simple_explanation']
 	# st.session_state.summary = summary
@@ -171,13 +191,13 @@ def save_file(uploaded_file):
 
 # 병원 찾기 함수
 def search_clinics(specialty, k=3):
-	if specialty == '해당없음':
+	if specialty == '해당없음': # 추천된 병원이 없는 경우
 		with container_result:
 			st.markdown('추천 진료 병원이 없습니다.')
 
 		return None
 
-	if user_location['latitude'] == None:
+	if user_location['latitude'] == None: # 위치 정보 버튼 누르도록 경고
 		with container_result:
 			st.markdown('위치 정보가 필요합니다. 위치 정보 활용 버튼을 클릭해주세요.')
 
@@ -214,14 +234,14 @@ def show_map(place_name):
 
 
 
-########## UI ###########
+################## UI 설계 ###################
 
 # 웹 탭 꾸미기
 st.set_page_config(
     page_title="AI 건강검진결과 분석 도우미 - MAGIC",
 )
 
-# # 사이드바 
+# # 사이드바 (스트림릿 배포 시 사용자 API Key 입력을 위해 코드 사용)
 # with st.sidebar:
 
 # 	def on_submit(): # API key submit 버튼 클릭 시
@@ -291,7 +311,7 @@ with container_file:
 
 # 결과 표시 칸
 container_result = st.container()
-
+# LLM 추론 후 'has_result' 세션 상태가 True로 바뀌었을 때 결과 펴시 활성화
 if 'has_result' in st.session_state and st.session_state.has_result:
     # 결과 표시
     with container_result:
@@ -324,7 +344,7 @@ container_map = st.container()
 # 구분선 추가
 st.divider()
 
-# 챗봇 섹션
+###################### 챗봇 섹션 ######################
 st.subheader("건강 상담 챗봇")
 st.markdown("건강 검진 결과나 의학적 궁금증에 대해 질문해보세요.")
 
@@ -350,7 +370,6 @@ if prompt := st.chat_input("질문을 입력하세요"):
         try:
             if st.session_state.API_KEY and st.session_state.health_info:
                 # rag_based_query_system의 main 함수를 직접 호출하여 응답 생성
-                from rag_based_query_system import main as rag_main
                 response = rag_main(
                     api_key=st.session_state.API_KEY,
                     health_status=st.session_state.health_info,
