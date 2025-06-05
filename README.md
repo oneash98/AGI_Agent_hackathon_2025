@@ -50,9 +50,16 @@ cd <repository_directory> # 디렉토리 경로
 # 필요 패키지 설치
 pip install -r requirements.txt # Python == 3.12
 
-# .env 파일 생성
+# .env 파일 생성 (MAC)
 echo "API_KEY = '<your Upstage API KEY>'" > .env
 echo "GOOGLE_MAPS_API_KEY = '<your Google Maps API KEY>'" >> .env
+
+# .env 파일 생성 (Window)
+chcp # 현재 코드페이지 확인
+chcp 65001 # 65001(UTF-8)이 아닌 경우
+echo "API_KEY = '<your Upstage API KEY>'" > .env
+echo "GOOGLE_MAPS_API_KEY = '<your Google Maps API KEY>'" >> .env
+chcp <기존 코드> # (선택) 기존 코드페이지로 복원
 
 # streamlit 실행
 streamlit run UI.py
