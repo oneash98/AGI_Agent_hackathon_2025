@@ -74,14 +74,14 @@ class HealthRAGSystem:
     # 최종 답변 생성
     def generate_response(self, query: str) -> str:
         """Generate final response using Solar LLM"""
-        # 질문 전처리
-        processed_query = self.preprocess_query(query)
+        # # 질문 전처리
+        # processed_query = self.preprocess_query(query)
         
         # 관련 지식 검색
-        relevant_snippets = self.retrieve_relevant_snippets(processed_query)
+        relevant_snippets = self.retrieve_relevant_snippets(query)
         
         # 프롬프트 생성
-        prompt = self.construct_prompt(processed_query, relevant_snippets)
+        prompt = self.construct_prompt(query, relevant_snippets)
         
         # LLM 답변 생성
         response = self.client.chat.completions.create(
